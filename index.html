@@ -161,13 +161,6 @@
   body.player { overflow: hidden; }
   body.player .titlebar, body.player .statusbar, body.player .hint,
   body.player main > :not(:has(.screen)) { display: none; }
-  .player-tip {
-    position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.65); color: var(--white);
-    padding: 6px 16px; font-size: 22px; white-space: nowrap;
-    pointer-events: none; transition: opacity .8s;
-  }
-  body:not(.player) .player-tip, .player-tip.gone { opacity: 0; }
   .player-exit {
     position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
     display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center;
@@ -382,7 +375,6 @@
     <div class="screen" id="screen">
       <canvas id="display" aria-label="Letreiro"></canvas>
       <span class="hint">Esc para sair da tela cheia</span>
-      <div class="player-tip" id="player-tip" aria-hidden="true"></div>
       <div class="player-exit" id="player-exit" hidden>
         <span>Sair da exibição?</span>
         <button class="primary" id="btn-sair" type="button">Voltar ao editor</button>
@@ -410,7 +402,8 @@
       </label>
       <button class="primary" type="submit">Salvar</button>
     </form>
-    <p class="note">Cada letreiro salvo abre <b>só rodando</b>, sem os controles, para ninguém mudar nada.</p>
+    <p class="note">Cada letreiro salvo abre <b>só rodando</b>, sem os controles e sem nenhum aviso na tela, para ninguém mudar nada.
+      Durante a exibição, o primeiro toque liga a tela cheia e a música; para voltar ao editor, <b>segure o dedo no letreiro por 1 segundo</b>.</p>
     <ul class="saved-list" id="lista-salvos"></ul>
   </section>
 
@@ -4345,17 +4338,6 @@
       : `Arquivo salvo em Downloads. É só abrir que ele já começa rodando.${offline || " Funciona sem internet."}`);
   }
 
-  function showPlayerTip() {
-    const tip = $("player-tip");
-    const waitsForTap = !player.canExit && bakedMusic;
-    tip.textContent = player.canExit ? "Toque para tela cheia · segure para sair"
-      : waitsForTap ? "Toque na tela para começar" : "Toque para tela cheia";
-    tip.classList.remove("gone");
-    clearTimeout(tip.timer);
-    // A file that carries music keeps the hint up until the first tap starts the sound.
-    if (!waitsForTap) tip.timer = setTimeout(() => tip.classList.add("gone"), 4000);
-  }
-
   function enterPlayer(values, canExit) {
     player = { canExit, editorValues: canExit ? snapshotValues() : null };
     // The viewer page ships without a title (see signLink); name the tab after the sign once it is open.
@@ -4368,7 +4350,8 @@
       document.body.classList.add("player");
       $("screen").classList.add("pseudo-full");
     });
-    showPlayerTip();
+    // No hint is drawn over the sign (the user wants it clean from the first frame): the first tap
+    // turns on fullscreen and the music, and holding a finger on it offers the way out.
     wakeCursor();
     keepAwake();
     if (canExit) musicOnShow();
@@ -4752,7 +4735,6 @@
     const events = ["pointerdown", "keydown", "touchstart"];
     const go = () => {
       for (const ev of events) window.removeEventListener(ev, go, true);
-      $("player-tip").classList.add("gone");
       if (audio.paused) audio.play().catch(() => {});
     };
     for (const ev of events) window.addEventListener(ev, go, true);
