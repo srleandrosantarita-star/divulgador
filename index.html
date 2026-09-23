@@ -193,6 +193,46 @@
   .saved-link { flex-basis: 100%; font-size: 16px; }
   .saved-empty { color: var(--grey); border: 0 !important; }
 
+  /* Music */
+  .music-player { display: grid; gap: 14px; }
+  .music-now { display: grid; gap: 2px; }
+  .music-label { color: var(--grey); font-size: 18px; }
+  .music-title { color: var(--yellow); font-size: 26px; overflow-wrap: anywhere; }
+  .music-controls { display: flex; flex-wrap: wrap; gap: 14px; }
+  .music-controls button { font-size: 26px; min-width: 70px; padding: 4px 16px; }
+  .music-progress {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .music-add { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 20px; }
+  label.file-btn {
+    position: relative; display: inline-block; color: var(--black); background: var(--cyan);
+    padding: 6px 22px; font-size: 22px; box-shadow: 6px 6px 0 var(--black); cursor: pointer;
+  }
+  .file-btn input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+  .file-btn:focus-within { outline: 2px solid var(--yellow); outline-offset: 2px; }
+  .file-btn:hover { filter: brightness(1.12); }
+  .music-info { color: var(--grey); font-size: 18px; }
+  .music-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 4px; }
+  .music-list li {
+    display: grid; grid-template-columns: 2.4ch minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
+    padding: 6px 8px; border-top: 1px dashed var(--grey);
+  }
+  .music-list li.playing { background: rgba(0, 168, 168, 0.28); }
+  .music-list li.playing .mus-name { color: var(--yellow); }
+  .mus-num, .mus-dur { color: var(--grey); font-variant-numeric: tabular-nums; }
+  .mus-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mus-row-actions { display: flex; gap: 6px; }
+  .music-list button { font-size: 18px; padding: 2px 10px; box-shadow: 3px 3px 0 var(--black); }
+  .music-list button.danger { background: var(--red); color: var(--white); }
+  .music-list li.music-empty { display: block; color: var(--grey); border: 0; }
+  @media (max-width: 560px) {
+    .music-list li { grid-template-columns: 2.4ch minmax(0, 1fr) auto; }
+    .mus-row-actions { grid-column: 2 / -1; }
+  }
+  .status-music { color: var(--blue); }
+  #btn-musica.on { background: var(--yellow); }
+
   .actions { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
   button {
     font: inherit;
@@ -333,6 +373,7 @@
     <button id="btn-random" type="button"><kbd>F5</kbd> Surpresa</button>
     <button id="btn-auto" type="button"><kbd>F6</kbd> Automático</button>
     <button id="btn-salvar" type="button">Salvar letreiro</button>
+    <button id="btn-musica" type="button"><kbd>M</kbd> ♫ Música</button>
   </div>
   <p class="toast" id="toast" role="status"></p>
 
@@ -346,6 +387,58 @@
     </form>
     <p class="note">Cada letreiro salvo abre <b>só rodando</b>, sem os controles, para ninguém mudar nada.</p>
     <ul class="saved-list" id="lista-salvos"></ul>
+  </section>
+
+  <section class="win" id="musica-win">
+    <h2>[ ♫ Música ]</h2>
+    <div class="music-player">
+      <div class="music-now">
+        <span class="music-label" id="mus-estado">Parada</span>
+        <span class="music-title" id="mus-atual">Nenhuma música na lista ainda</span>
+      </div>
+      <div class="music-controls">
+        <button id="mus-ant" type="button" aria-label="Música anterior">⏮</button>
+        <button id="mus-play" class="primary" type="button" aria-label="Tocar">▶</button>
+        <button id="mus-prox" type="button" aria-label="Próxima música">⏭</button>
+      </div>
+      <div class="music-progress">
+        <span id="mus-tempo">0:00</span>
+        <input id="mus-barra" type="range" min="0" max="1000" step="1" value="0" aria-label="Posição da música">
+        <span id="mus-total">0:00</span>
+      </div>
+      <div class="fields">
+        <label>Volume <output id="mus-volume-out"></output>
+          <input id="mus-volume" type="range" min="0" max="100" step="1" value="80">
+        </label>
+        <label>Repetir
+          <select id="mus-repetir">
+            <option value="lista">Sim, sem parar</option>
+            <option value="uma">Só a música atual</option>
+            <option value="nao">Não repetir</option>
+          </select>
+        </label>
+        <label>Ordem
+          <select id="mus-ordem">
+            <option value="normal">Na ordem da lista</option>
+            <option value="aleatoria">Aleatória</option>
+          </select>
+        </label>
+        <label>Ao exibir um letreiro salvo
+          <select id="mus-exibir">
+            <option value="tocar">Tocar a música</option>
+            <option value="nao">Não tocar</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="music-add">
+      <label class="file-btn">+ Adicionar música
+        <input id="mus-arquivos" type="file" accept="audio/*" multiple>
+      </label>
+      <span class="music-info" id="mus-info"></span>
+    </div>
+    <ol class="music-list" id="mus-lista"></ol>
+    <p class="note">As músicas ficam guardadas <b>só neste aparelho</b>. Elas continuam tocando enquanto o letreiro é exibido.</p>
   </section>
 
   <div class="cols">
@@ -681,6 +774,8 @@
   <span><kbd>Espaço</kbd> Pausar</span>
   <span><kbd>F5</kbd> Surpresa</span>
   <span><kbd>F6</kbd> Automático</span>
+  <span><kbd>M</kbd> Música</span>
+  <span id="status-musica" class="status-music"></span>
   <span><kbd>Esc</kbd> Sair da tela cheia</span>
 </footer>
 
@@ -865,24 +960,24 @@
     aniversario: { texto: "FELIZ ANIVERSÁRIO!", fonte: "Bungee", estilo: "3d", pintura: "arcoiris-anim", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#2a0a4a", movimento: "parado", letras: "pular", fundo: "confete", "cor-fundo": "#1b0b5a", borda: "luzes", velocidade: 4 },
     // Festas infantis
     infantil: { texto: "PARABÉNS!", texto2: "5 ANINHOS DE MUITA ALEGRIA", tamanho2: 0.5, fonte: "Chewy", estilo: "adesivo", pintura: "solida", mistura: "cores", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "pular", fundo: "baloes", "cor-fundo": "#23145c", borda: "bandeirinhas", velocidade: 4 },
-    heroi: { texto: "HERÓIS EM AÇÃO!", texto2: "O PODER DA DIVERSÃO", tamanho2: 0.45, fonte: "Bangers", estilo: "quadrinhos", pintura: "solida", espaco: 6, "cor-texto": "#ffd23f", "cor-efeito": "#d0021b", movimento: "parado", letras: "zoom", fundo: "holofotes", "cor-fundo": "#0b1d4a", borda: "estrelas-girando", velocidade: 5 },
-    princesa: { texto: "Festa da Princesa", texto2: "UM DIA DE CONTO DE FADAS", tamanho2: 0.45, fonte: "Emilys Candy", estilo: "brilhos", pintura: "degrade", espaco: 3, "cor-texto": "#ffb3de", "cor-efeito": "#b983ff", movimento: "parado", letras: "onda", fundo: "purpurina", "cor-fundo": "#3a0f3f", borda: "flores", velocidade: 3 },
+    heroi: { texto: "HERÓIS EM AÇÃO!", texto2: "O PODER DA DIVERSÃO", tamanho2: 0.5, fonte: "Bangers", estilo: "quadrinhos", pintura: "solida", espaco: 6, "cor-texto": "#ffd23f", "cor-efeito": "#d0021b", movimento: "parado", letras: "zoom", fundo: "holofotes", "cor-fundo": "#0b1d4a", borda: "estrelas-girando", velocidade: 5 },
+    princesa: { texto: "Festa da Princesa", texto2: "UM DIA DE CONTO DE FADAS", tamanho2: 0.5, fonte: "Emilys Candy", estilo: "brilhos", pintura: "degrade", espaco: 3, "cor-texto": "#ffb3de", "cor-efeito": "#b983ff", movimento: "parado", letras: "onda", fundo: "purpurina", "cor-fundo": "#3a0f3f", borda: "flores", velocidade: 3 },
     mar: { texto: "FUNDO DO MAR", texto2: "VEM MERGULHAR COM A GENTE!", tamanho2: 0.5, fonte: "Chewy", estilo: "sombra", pintura: "oceano", espaco: 4, "cor-texto": "#caf0f8", "cor-efeito": "#012a4a", movimento: "parado", letras: "onda", fundo: "bolhas", "cor-fundo": "#01497c", borda: "nenhuma", velocidade: 3 },
     dino: { texto: "DINO FESTA!", texto2: "RAAAWR! CHEGOU A HORA", tamanho2: 0.5, fonte: "Rubik Wet Paint", estilo: "3d", pintura: "solida", espaco: 4, "cor-texto": "#9be15d", "cor-efeito": "#1b4d1b", movimento: "parado", letras: "tremer", fundo: "confete", "cor-fundo": "#16301a", borda: "estrelas", velocidade: 5 },
-    circo: { texto: "O CIRCO CHEGOU!", texto2: "RESPEITÁVEL PÚBLICO", tamanho2: 0.45, fonte: "Sancreek", estilo: "3d", pintura: "solida", espaco: 4, "cor-texto": "#ffd23f", "cor-efeito": "#b30019", movimento: "parado", letras: "pular", fundo: "holofotes", "cor-fundo": "#2a0508", borda: "luzes", velocidade: 4 },
+    circo: { texto: "O CIRCO CHEGOU!", texto2: "RESPEITÁVEL PÚBLICO", tamanho2: 0.5, fonte: "Sancreek", estilo: "3d", pintura: "solida", espaco: 4, "cor-texto": "#ffd23f", "cor-efeito": "#b30019", movimento: "parado", letras: "pular", fundo: "holofotes", "cor-fundo": "#2a0508", borda: "luzes", velocidade: 4 },
     espaco: { texto: "MISSÃO ESPACIAL", texto2: "3… 2… 1… DECOLAR!", tamanho2: 0.5, fonte: "Audiowide", estilo: "neon", pintura: "solida", espaco: 6, "cor-texto": "#e0f7ff", "cor-efeito": "#3ec1d3", movimento: "parado", letras: "cair", fundo: "estrelas", "cor-fundo": "#03030f", borda: "estrelas-girando", velocidade: 4 },
     pijama: { texto: "FESTA DO PIJAMA", texto2: "TRAGA SEU TRAVESSEIRO!", tamanho2: 0.5, fonte: "Sniglet", estilo: "adesivo", pintura: "arcoiris", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "balancar", fundo: "estrelas", "cor-fundo": "#1b1446", borda: "nenhuma", velocidade: 3 },
     criancas: { texto: "FELIZ DIA DAS CRIANÇAS", texto2: "BRINCAR É COISA SÉRIA!", tamanho2: 0.5, fonte: "Lilita One", estilo: "adesivo", pintura: "solida", mistura: "tudo", espaco: 3, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "mistura", fundo: "confete", "cor-fundo": "#0f3b7a", borda: "baloes", velocidade: 4 },
     // Datas
     carnaval: { texto: "É CARNAVAL!", texto2: "ALEGRIA SEM FIM", tamanho2: 0.5, fonte: "Chango", estilo: "sombra", pintura: "arcoiris-anim", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#3a0070", movimento: "parado", letras: "pular", fundo: "serpentinas", "cor-fundo": "#2b0a4a", borda: "luzes", velocidade: 6 },
-    pascoa: { texto: "FELIZ PÁSCOA", texto2: "RENOVAÇÃO E ESPERANÇA", tamanho2: 0.45, fonte: "Chewy", estilo: "adesivo", pintura: "arcoiris", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "pular", fundo: "bolhas", "cor-fundo": "#2e6f4e", borda: "flores", velocidade: 3 },
+    pascoa: { texto: "FELIZ PÁSCOA", texto2: "RENOVAÇÃO E ESPERANÇA", tamanho2: 0.5, fonte: "Chewy", estilo: "adesivo", pintura: "arcoiris", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "pular", fundo: "bolhas", "cor-fundo": "#2e6f4e", borda: "flores", velocidade: 3 },
     halloween: { texto: "HALLOWEEN", texto2: "DOCES OU TRAVESSURAS?", tamanho2: 0.5, fonte: "Creepster", estilo: "derretendo", pintura: "degrade", espaco: 4, "cor-texto": "#ffa500", "cor-efeito": "#b33c00", movimento: "parado", letras: "nenhuma", fundo: "estrelas", "cor-fundo": "#140a1f", borda: "nenhuma", velocidade: 4 },
     // Eventos
     casamento: { texto: "Felicidades aos noivos", texto2: "COM AMOR, FAMÍLIA E AMIGOS", tamanho2: 0.35, fonte: "Great Vibes", estilo: "brilhos", pintura: "ouro", espaco: 2, "cor-texto": "#f5d68a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "nenhuma", fundo: "purpurina", "cor-fundo": "#1e1418", borda: "flores", velocidade: 3 },
     formatura: { texto: "PARABÉNS, FORMANDOS!", texto2: "TURMA 2026", tamanho2: 0.5, fonte: "Playfair Display", estilo: "reflexo", pintura: "ouro", espaco: 4, "cor-texto": "#f2c14e", "cor-efeito": "#8a5a12", movimento: "parado", letras: "zoom", fundo: "fogos", "cor-fundo": "#050a1f", borda: "estrelas-girando", velocidade: 4 },
-    boasvindas: { texto: "SEJAM BEM-VINDOS!", texto2: "É UMA ALEGRIA TER VOCÊ AQUI", tamanho2: 0.45, fonte: "Oswald", estilo: "sombra", pintura: "brilho", espaco: 6, "cor-texto": "#ffffff", "cor-efeito": "#0b3d91", movimento: "parado", letras: "nenhuma", fundo: "holofotes", "cor-fundo": "#0a1633", borda: "nenhuma", velocidade: 4 },
+    boasvindas: { texto: "SEJAM BEM-VINDOS!", texto2: "É UMA ALEGRIA TER VOCÊ AQUI", tamanho2: 0.5, fonte: "Oswald", estilo: "sombra", pintura: "brilho", espaco: 6, "cor-texto": "#ffffff", "cor-efeito": "#0b3d91", movimento: "parado", letras: "nenhuma", fundo: "holofotes", "cor-fundo": "#0a1633", borda: "nenhuma", velocidade: 4 },
     inauguracao: { texto: "GRANDE INAUGURAÇÃO", texto2: "PROMOÇÕES ESPECIAIS HOJE", tamanho2: 0.5, fonte: "Passion One", estilo: "3d", pintura: "solida", espaco: 4, "cor-texto": "#ffd23f", "cor-efeito": "#b30019", movimento: "rolar", letras: "nenhuma", fundo: "fogos", "cor-fundo": "#140404", borda: "luzes", velocidade: 4 },
-    culto: { texto: "SEJAM BEM-VINDOS", texto2: "QUE BOM QUE VOCÊ VEIO", tamanho2: 0.45, fonte: "Cinzel Decorative", estilo: "brilhos", pintura: "ouro", espaco: 4, "cor-texto": "#ffe08a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "nenhuma", fundo: "estrelas", "cor-fundo": "#0d1026", borda: "nenhuma", velocidade: 3 },
+    culto: { texto: "SEJAM BEM-VINDOS", texto2: "QUE BOM QUE VOCÊ VEIO", tamanho2: 0.5, fonte: "Cinzel Decorative", estilo: "brilhos", pintura: "ouro", espaco: 4, "cor-texto": "#ffe08a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "nenhuma", fundo: "estrelas", "cor-fundo": "#0d1026", borda: "nenhuma", velocidade: 3 },
     junina: { texto: "ARRAIÁ!", fonte: "Rye", estilo: "sombra", pintura: "por-do-sol", espaco: 6, "cor-texto": "#ffd23f", "cor-efeito": "#5a2600", movimento: "parado", letras: "balancar", fundo: "fogos", "cor-fundo": "#1f0d2e", borda: "bandeirinhas", velocidade: 4 },
     natal: { texto: "FELIZ NATAL", fonte: "Cinzel Decorative", estilo: "brilhos", pintura: "ouro", espaco: 6, "cor-texto": "#ffe08a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "onda", fundo: "neve", "cor-fundo": "#0b3d2e", borda: "pisca", velocidade: 3 },
     anonovo: { texto: "FELIZ ANO NOVO!", fonte: "Playfair Display", estilo: "reflexo", pintura: "brilho", espaco: 4, "cor-texto": "#f2c14e", "cor-efeito": "#ffffff", movimento: "parado", letras: "zoom", fundo: "fogos", "cor-fundo": "#05060f", borda: "estrelas-girando", velocidade: 4 },
@@ -948,8 +1043,20 @@
     grp.appendChild(o);
   }
 
+  // A value a list doesn't offer (from an old save or a preset) falls back to the nearest
+  // numeric option, or is left alone, so a list never ends up blank.
   function applyValues(obj) {
-    for (const id of IDS.concat(AUTO_IDS)) if (obj[id] != null) $(id).value = obj[id];
+    for (const id of IDS.concat(AUTO_IDS)) {
+      if (obj[id] == null) continue;
+      const el = $(id), v = String(obj[id]);
+      if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === v)) {
+        const n = parseFloat(v);
+        const nums = [...el.options].map((o) => o.value).filter((x) => !isNaN(parseFloat(x)));
+        if (!isNaN(n) && nums.length) el.value = nums.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
+        continue;
+      }
+      el.value = v;
+    }
   }
   applyValues(PRESETS.dos);
   $("movimento").value = "rolar";
@@ -974,7 +1081,7 @@
     return {
       text: $("texto").value,
       text2: $("texto2").value,
-      size2: +$("tamanho2").value,
+      size2: +$("tamanho2").value || 0.65,
       own2: $("cores2").value === "propria",
       fg2: $("cor-texto2").value,
       fx2: $("cor-efeito2").value,
@@ -4186,6 +4293,7 @@
     showPlayerTip();
     wakeCursor();
     keepAwake();
+    if (canExit) musicOnShow();
     const s = readState();
     if (s.auto || mixFonts(s)) preloadFonts();
   }
@@ -4223,6 +4331,321 @@
     $("nome-salvo").select();
   });
   renderSaved();
+
+  // ---------- music ----------
+  // Songs picked from the device are kept in IndexedDB (only on this device) and play under the sign.
+  const MUSIC_DB = "divulgador-musicas", MUSIC_STORE = "musicas", MUSIC_CFG = "divulgador-musica-config";
+  const audio = new Audio();
+  audio.preload = "auto";
+  let tracks = [];             // { id, name, size, duration, blob, order }
+  let currentId = null, currentUrl = null, shuffleBag = [], seeking = false, failures = 0;
+
+  let musicDb = null;
+  function openMusicDb() {
+    if (!musicDb) musicDb = new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error("IndexedDB indisponível")); return; }
+      const req = indexedDB.open(MUSIC_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(MUSIC_STORE, { keyPath: "id" });
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return musicDb;
+  }
+  function dbRun(mode, action) {
+    return openMusicDb().then((d) => new Promise((resolve, reject) => {
+      const t = d.transaction(MUSIC_STORE, mode);
+      const req = action(t.objectStore(MUSIC_STORE));
+      t.oncomplete = () => resolve(req && req.result);
+      t.onerror = t.onabort = () => reject(t.error || (req && req.error));
+    }));
+  }
+  const dbAll = () => dbRun("readonly", (s) => s.getAll());
+  const dbPut = (rec) => dbRun("readwrite", (s) => s.put(rec));
+  const dbDelete = (id) => dbRun("readwrite", (s) => s.delete(id));
+
+  const sortedTracks = () => tracks.slice().sort((a, b) => a.order - b.order);
+  const trackById = (id) => tracks.find((t) => t.id === id);
+  const fmtTime = (s) => {
+    if (!isFinite(s) || s < 0) s = 0;
+    return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  };
+
+  function loadMusicCfg() {
+    let c = {};
+    try { c = JSON.parse(localStorage.getItem(MUSIC_CFG) || "{}"); } catch (e) {}
+    if (c.volume != null) $("mus-volume").value = c.volume;
+    for (const [id, key] of [["mus-repetir", "repetir"], ["mus-ordem", "ordem"], ["mus-exibir", "exibir"]]) if (c[key]) $(id).value = c[key];
+    audio.volume = +$("mus-volume").value / 100;
+    $("mus-volume-out").textContent = $("mus-volume").value + "%";
+    return c;
+  }
+  function saveMusicCfg() {
+    try {
+      localStorage.setItem(MUSIC_CFG, JSON.stringify({
+        volume: +$("mus-volume").value, repetir: $("mus-repetir").value,
+        ordem: $("mus-ordem").value, exibir: $("mus-exibir").value, atual: currentId,
+      }));
+    } catch (e) {}
+  }
+
+  // Reads a file's length; -1 means this browser cannot play it.
+  function readDuration(blob) {
+    return new Promise((resolve) => {
+      const probe = new Audio();
+      const url = URL.createObjectURL(blob);
+      const done = (d) => { URL.revokeObjectURL(url); resolve(d); };
+      probe.preload = "metadata";
+      probe.onloadedmetadata = () => done(isFinite(probe.duration) ? probe.duration : 0);
+      probe.onerror = () => done(-1);
+      probe.src = url;
+    });
+  }
+
+  async function addSongs(files) {
+    let added = 0, skipped = 0, full = false;
+    let order = tracks.reduce((m, t) => Math.max(m, t.order), 0);
+    $("mus-info").textContent = "Guardando…";
+    for (const file of files) {
+      const duration = await readDuration(file);
+      if (duration < 0) { skipped++; continue; }
+      const rec = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        name: file.name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim() || "Música",
+        size: file.size, duration, blob: file, order: ++order,
+      };
+      try { await dbPut(rec); } catch (e) { full = true; break; }
+      tracks.push(rec);
+      added++;
+    }
+    // Ask the browser not to clear the songs when the device runs low on space.
+    if (added && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    if (added && !currentId) loadTrack(sortedTracks()[0]);
+    renderMusic();
+    if (full) toast("Não há espaço para guardar mais músicas neste aparelho.");
+    else if (skipped) toast(skipped === 1
+      ? "Um arquivo não pôde ser tocado neste aparelho e ficou de fora."
+      : `${skipped} arquivos não puderam ser tocados neste aparelho e ficaram de fora.`);
+    else if (added) toast(added === 1 ? "Música adicionada! Toque em ▶ para ouvir." : `${added} músicas adicionadas! Toque em ▶ para ouvir.`);
+  }
+
+  function loadTrack(t) {
+    if (!t) return;
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = URL.createObjectURL(t.blob);
+    currentId = t.id;
+    audio.src = currentUrl;
+    if ("mediaSession" in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: t.name, artist: "Divulgador",
+          artwork: [{ src: "icons/icon-512.png", sizes: "512x512", type: "image/png" }],
+        });
+      } catch (e) {}
+    }
+    saveMusicCfg();
+    renderMusic();
+  }
+
+  async function playTrack(t) {
+    if (!t) return;
+    if (t.id !== currentId || !audio.src) loadTrack(t);
+    try { await audio.play(); } catch (e) { if (e.name === "NotAllowedError") toast("Toque em ▶ para começar a música."); }
+  }
+
+  function togglePlay() {
+    if (!tracks.length) {
+      toast("Adicione uma música primeiro.");
+      $("musica-win").scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (audio.paused) playTrack(trackById(currentId) || sortedTracks()[0]);
+    else audio.pause();
+  }
+
+  // auto = the song ended by itself (repeat rules apply); otherwise the ⏭ button was pressed.
+  function nextTrack(auto) {
+    const list = sortedTracks();
+    if (!list.length) return;
+    const rep = $("mus-repetir").value;
+    if (auto && (rep === "uma" || list.length === 1)) {
+      if (rep === "nao") { renderMusic(); return; }
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+      return;
+    }
+    let next;
+    if ($("mus-ordem").value === "aleatoria" && list.length > 1) {
+      shuffleBag = shuffleBag.filter((id) => trackById(id) && id !== currentId);
+      if (!shuffleBag.length) shuffleBag = list.map((t) => t.id).filter((id) => id !== currentId).sort(() => Math.random() - 0.5);
+      next = trackById(shuffleBag.shift());
+    } else {
+      const i = list.findIndex((t) => t.id === currentId);
+      if (auto && rep === "nao" && i === list.length - 1) { renderMusic(); return; }
+      next = list[(i + 1) % list.length];
+    }
+    playTrack(next);
+  }
+
+  function prevTrack() {
+    if (audio.currentTime > 3 || tracks.length < 2) { audio.currentTime = 0; return; }
+    const list = sortedTracks();
+    const i = list.findIndex((t) => t.id === currentId);
+    playTrack(list[(i - 1 + list.length) % list.length]);
+  }
+
+  async function removeTrack(id) {
+    try { await dbDelete(id); } catch (e) {}
+    tracks = tracks.filter((t) => t.id !== id);
+    if (id === currentId) {
+      const wasPlaying = !audio.paused;
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+      currentUrl = null; currentId = null;
+      const first = sortedTracks()[0];
+      if (first) { if (wasPlaying) playTrack(first); else loadTrack(first); }
+      saveMusicCfg();
+    }
+    renderMusic();
+  }
+
+  async function moveTrack(id, dir) {
+    const list = sortedTracks();
+    const i = list.findIndex((t) => t.id === id), j = i + dir;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i].order, list[j].order] = [list[j].order, list[i].order];
+    try { await Promise.all([dbPut(list[i]), dbPut(list[j])]); } catch (e) {}
+    renderMusic();
+  }
+
+  function renderMusic() {
+    const t = trackById(currentId);
+    const playing = !audio.paused && !!t;
+    $("mus-atual").textContent = t ? t.name : tracks.length ? "Escolha uma música da lista" : "Nenhuma música na lista ainda";
+    $("mus-estado").textContent = playing ? "Tocando agora" : t ? "Pausada" : "Parada";
+    $("mus-play").textContent = playing ? "⏸" : "▶";
+    $("mus-play").setAttribute("aria-label", playing ? "Pausar" : "Tocar");
+    $("btn-musica").classList.toggle("on", playing);
+    $("status-musica").textContent = playing ? "♫ " + t.name : "";
+    if ("mediaSession" in navigator) navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+
+    const mb = tracks.reduce((s, x) => s + x.size, 0) / 1024 / 1024;
+    $("mus-info").textContent = tracks.length
+      ? `${tracks.length === 1 ? "1 música" : tracks.length + " músicas"} · ${mb < 1 ? "menos de 1" : mb.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`
+      : "";
+
+    const ol = $("mus-lista");
+    ol.textContent = "";
+    if (!tracks.length) {
+      const li = document.createElement("li");
+      li.className = "music-empty";
+      li.textContent = "Toque em “+ Adicionar música” e escolha um arquivo de música (MP3, M4A, WAV…).";
+      ol.appendChild(li);
+      return;
+    }
+    sortedTracks().forEach((tr, idx, arr) => {
+      const li = document.createElement("li");
+      if (tr.id === currentId) li.className = "playing";
+      const num = document.createElement("span"); num.className = "mus-num"; num.textContent = idx + 1;
+      const name = document.createElement("span"); name.className = "mus-name"; name.textContent = tr.name; name.title = tr.name;
+      const dur = document.createElement("span"); dur.className = "mus-dur"; dur.textContent = fmtTime(tr.duration);
+      const acts = document.createElement("div"); acts.className = "mus-row-actions";
+      const b = (label, aria, fn) => {
+        const el = document.createElement("button");
+        el.type = "button"; el.textContent = label; el.setAttribute("aria-label", aria);
+        el.addEventListener("click", () => fn(el));
+        acts.appendChild(el);
+        return el;
+      };
+      b("▶", `Tocar ${tr.name}`, () => { if (tr.id === currentId && !audio.paused) return; playTrack(tr); });
+      if (arr.length > 1) {
+        b("↑", "Subir na lista", () => moveTrack(tr.id, -1));
+        b("↓", "Descer na lista", () => moveTrack(tr.id, 1));
+      }
+      b("✕", `Tirar ${tr.name} da lista`, (el) => {
+        if (el.dataset.armed) { removeTrack(tr.id); return; }
+        el.dataset.armed = "1"; el.textContent = "Tirar?"; el.classList.add("danger");
+        setTimeout(() => { if (el.isConnected) { delete el.dataset.armed; el.textContent = "✕"; el.classList.remove("danger"); } }, 3000);
+      });
+      li.append(num, name, dur, acts);
+      ol.appendChild(li);
+    });
+  }
+
+  function renderProgress() {
+    if (seeking) return;
+    const d = audio.duration;
+    $("mus-tempo").textContent = fmtTime(audio.currentTime);
+    $("mus-total").textContent = fmtTime(isFinite(d) ? d : (trackById(currentId) || {}).duration);
+    $("mus-barra").value = isFinite(d) && d > 0 ? Math.round((audio.currentTime / d) * 1000) : 0;
+  }
+
+  // Called when a saved sign starts showing from the editor (a tap, so the browser allows sound).
+  function musicOnShow() {
+    if ($("mus-exibir").value === "tocar" && tracks.length && audio.paused) playTrack(trackById(currentId) || sortedTracks()[0]);
+  }
+
+  audio.addEventListener("play", renderMusic);
+  audio.addEventListener("pause", renderMusic);
+  audio.addEventListener("playing", () => { failures = 0; });
+  audio.addEventListener("timeupdate", renderProgress);
+  audio.addEventListener("loadedmetadata", renderProgress);
+  audio.addEventListener("ended", () => nextTrack(true));
+  audio.addEventListener("error", () => {
+    if (!audio.getAttribute("src")) return;
+    failures++;
+    toast("Não foi possível tocar esta música.");
+    if (failures < tracks.length && tracks.length > 1) nextTrack(false);
+  });
+
+  $("mus-play").addEventListener("click", togglePlay);
+  $("mus-prox").addEventListener("click", () => { if (tracks.length) nextTrack(false); });
+  $("mus-ant").addEventListener("click", () => { if (tracks.length) prevTrack(); });
+  $("mus-barra").addEventListener("input", () => {
+    seeking = true;
+    const d = audio.duration;
+    if (isFinite(d)) $("mus-tempo").textContent = fmtTime((+$("mus-barra").value / 1000) * d);
+  });
+  $("mus-barra").addEventListener("change", () => {
+    const d = audio.duration;
+    if (isFinite(d)) audio.currentTime = (+$("mus-barra").value / 1000) * d;
+    seeking = false;
+    renderProgress();
+  });
+  $("mus-volume").addEventListener("input", () => {
+    audio.volume = +$("mus-volume").value / 100;
+    $("mus-volume-out").textContent = $("mus-volume").value + "%";
+    saveMusicCfg();
+  });
+  for (const id of ["mus-repetir", "mus-ordem", "mus-exibir"]) $(id).addEventListener("input", () => { shuffleBag = []; saveMusicCfg(); });
+  $("mus-arquivos").addEventListener("change", (e) => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    if (files.length) addSongs(files);
+  });
+  $("btn-musica").addEventListener("click", () => {
+    $("musica-win").scrollIntoView({ behavior: "smooth", block: "center" });
+    if (tracks.length) togglePlay();
+  });
+  if ("mediaSession" in navigator) {
+    const ms = navigator.mediaSession;
+    const on = (action, fn) => { try { ms.setActionHandler(action, fn); } catch (e) {} };
+    on("play", () => { if (audio.paused) togglePlay(); });
+    on("pause", () => audio.pause());
+    on("nexttrack", () => nextTrack(false));
+    on("previoustrack", prevTrack);
+  }
+
+  const musicCfg = loadMusicCfg();
+  renderMusic();
+  dbAll().then((list) => {
+    tracks = list || [];
+    const saved = trackById(musicCfg.atual) || sortedTracks()[0];
+    if (saved) loadTrack(saved); else renderMusic();
+  }).catch(() => {
+    $("mus-info").textContent = "Este navegador não deixa guardar músicas.";
+  });
 
   $("modelo").addEventListener("change", () => {
     const p = PRESETS[$("modelo").value];
@@ -4287,6 +4710,7 @@
     else if (e.key === "F5") { e.preventDefault(); surprise(); }
     else if (e.key === "F6") { e.preventDefault(); setAuto($("auto").value !== "on"); }
     else if (e.key === " " && !inControl) { e.preventDefault(); setPaused(!paused); }
+    else if ((e.key === "m" || e.key === "M") && !inControl && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); togglePlay(); }
   });
 
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches && !hasSaved) {

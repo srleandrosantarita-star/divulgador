@@ -19,6 +19,11 @@ Monte o letreiro, toque em **Salvar letreiro** e dê um nome. Em **Meus letreiro
 - enviado por **link**, que abre o letreiro rodando em qualquer aparelho, sem opção de mudar nada;
 - baixado como **arquivo** que já abre rodando, mesmo sem internet.
 
+## Música
+
+Toque em **♫ Música** e em **+ Adicionar música** para escolher uma música do aparelho. Ela fica guardada só nele,
+toca em repetição enquanto o letreiro roda e começa sozinha ao exibir um letreiro salvo.
+
 ## O que tem
 
 - 162 fontes, 38 efeitos de letra, duas linhas de texto com cores próprias
