@@ -1,0 +1,3982 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Divulgador</title>
+<meta name="description" content="Letreiro animado para festas e eventos.">
+<meta name="theme-color" content="#0000a8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+  html, body { margin: 0; }
+  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  [hidden] { display: none !important; }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<style>
+  /* Deliberately single-look: a DOS text-mode screen, painted explicitly. */
+  :root {
+    --blue: #0000a8;
+    --cyan: #00a8a8;
+    --grey: #a8a8a8;
+    --white: #fcfcfc;
+    --yellow: #fcfc54;
+    --red: #a80000;
+    --black: #000000;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--blue); }
+  body {
+    color: var(--white);
+    font: 21px/1.25 "VT323", "Cascadia Mono", Consolas, ui-monospace, monospace;
+    padding-inline: 16px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .titlebar, .statusbar {
+    background: var(--grey);
+    color: var(--black);
+    margin-inline: -16px;
+    padding: 4px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 2ch;
+    justify-content: space-between;
+  }
+  .titlebar b { color: var(--blue); font-weight: normal; }
+  .statusbar {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    justify-content: flex-start;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+  }
+  .statusbar kbd { font: inherit; color: var(--red); }
+
+  main {
+    width: 100%;
+    max-width: 1120px;
+    margin: 34px auto 30px;
+    display: grid;
+    gap: 34px;
+  }
+  .win {
+    position: relative;
+    border: 4px double var(--white);
+    padding: 24px 18px 18px;
+    min-width: 0;
+  }
+  .win > h2 {
+    position: absolute;
+    top: -0.72em;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0 1ch;
+    background: var(--blue);
+    color: var(--white);
+    font: inherit;
+    font-size: 23px;
+    white-space: nowrap;
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
+    gap: 34px;
+  }
+  .fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+    gap: 16px 20px;
+  }
+  .text-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(min(100%, 230px), auto);
+    gap: 16px 20px;
+    align-items: end;
+  }
+  @media (max-width: 640px) { .text-row { grid-template-columns: 1fr; } }
+  .line2-row, .line2-colors { margin-top: 16px; }
+  label:has(:disabled) { opacity: .45; }
+  :disabled { cursor: not-allowed; }
+  #texto2 { font-size: 26px; color: var(--yellow); }
+  #texto2::placeholder { color: var(--grey); opacity: .6; }
+  label { display: grid; gap: 4px; color: var(--yellow); }
+  label output { color: var(--white); float: right; }
+  input[type="text"], select {
+    font: inherit;
+    color: var(--white);
+    background: var(--black);
+    border: 0;
+    border-bottom: 2px solid var(--cyan);
+    padding: 6px 10px;
+    width: 100%;
+    border-radius: 0;
+  }
+  #texto { font-size: 32px; color: var(--yellow); }
+  input[type="color"] {
+    width: 100%;
+    height: 40px;
+    background: var(--black);
+    border: 0;
+    padding: 4px;
+    cursor: pointer;
+  }
+  input[type="range"] { accent-color: var(--cyan); width: 100%; }
+  :focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+
+  .screen {
+    background: var(--black);
+    padding: 12px;
+    position: relative;
+  }
+  .screen canvas { display: block; width: 100%; height: clamp(160px, 28vw, 320px); }
+  .screen:fullscreen { padding: 0; display: flex; }
+  .screen:fullscreen canvas { height: 100%; }
+  /* Fallback when the browser refuses real fullscreen: the sign fills the page instead. */
+  .screen.pseudo-full {
+    position: fixed; inset: 0; z-index: 50; padding: 0; display: flex;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .screen.pseudo-full canvas { height: 100%; }
+  .hint {
+    position: absolute; right: 18px; bottom: 14px;
+    color: var(--grey); font-size: 18px; pointer-events: none;
+    transition: opacity .4s;
+  }
+  .screen:not(:fullscreen):not(.pseudo-full) .hint { display: none; }
+  .screen.idle:is(:fullscreen, .pseudo-full) { cursor: none; }
+  .screen.idle .hint { opacity: 0; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+  button {
+    font: inherit;
+    font-size: 25px;
+    color: var(--black);
+    background: var(--grey);
+    border: 0;
+    border-radius: 0;
+    padding: 6px 24px;
+    box-shadow: 7px 7px 0 var(--black);
+    cursor: pointer;
+  }
+  button.primary { background: var(--cyan); }
+  button kbd { font: inherit; color: var(--red); }
+  button:hover { filter: brightness(1.12); }
+  button:active { transform: translate(7px, 7px); box-shadow: none; }
+  .toast { color: var(--yellow); text-align: center; min-height: 1.25em; margin: -14px 0 0; }
+  .auto-row { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .auto-status { margin: 0; color: var(--cyan); }
+  .auto-row button { font-size: 21px; padding: 4px 18px; box-shadow: 5px 5px 0 var(--black); }
+  button.on { background: var(--yellow); }
+
+  @media (prefers-reduced-motion: reduce) {
+    button:active { transform: none; }
+  }
+</style>
+
+<header class="titlebar">
+  <span><b>DIVULGADOR.EXE</b> · letreiro de tela</span>
+  <span>v4.0 · 2026</span>
+</header>
+
+<main>
+  <section class="win">
+    <h2>[ Texto ]</h2>
+    <div class="text-row">
+      <label>Texto do letreiro
+        <input id="texto" type="text" value="FELIZ ANIVERSÁRIO!" maxlength="200" autocomplete="off">
+      </label>
+      <label>Modelo pronto
+        <select id="modelo">
+          <option value="">— escolha um modelo —</option>
+          <optgroup label="Festas infantis">
+            <option value="aniversario">Festa de aniversário</option>
+            <option value="infantil">Aniversário infantil</option>
+            <option value="heroi">Super-heróis</option>
+            <option value="princesa">Princesas</option>
+            <option value="mar">Fundo do mar</option>
+            <option value="dino">Dinossauros</option>
+            <option value="circo">Circo</option>
+            <option value="espaco">Astronauta / espaço</option>
+            <option value="pijama">Festa do pijama</option>
+            <option value="criancas">Dia das Crianças</option>
+            <option value="cha">Chá de bebê</option>
+          </optgroup>
+          <optgroup label="Datas comemorativas">
+            <option value="junina">Festa junina</option>
+            <option value="carnaval">Carnaval</option>
+            <option value="pascoa">Páscoa</option>
+            <option value="namorados">Dia dos Namorados</option>
+            <option value="halloween">Halloween</option>
+            <option value="natal">Natal</option>
+            <option value="anonovo">Ano Novo</option>
+          </optgroup>
+          <optgroup label="Eventos">
+            <option value="casamento">Casamento</option>
+            <option value="formatura">Formatura</option>
+            <option value="boasvindas">Boas-vindas</option>
+            <option value="inauguracao">Inauguração</option>
+            <option value="culto">Culto / encontro</option>
+            <option value="balada">Balada</option>
+          </optgroup>
+          <optgroup label="Estilos">
+            <option value="neon">Neon de bar</option>
+            <option value="led">Painel de LED</option>
+            <option value="anos80">Anos 80 cromado</option>
+            <option value="fogo">Letras de fogo</option>
+            <option value="terror">Filme de terror</option>
+            <option value="maquina">Máquina de escrever</option>
+            <option value="gibi">Gibi (quadrinhos)</option>
+            <option value="gosma">Gosma derretendo</option>
+            <option value="cinema">Estreia de cinema</option>
+            <option value="dos">DOS clássico</option>
+          </optgroup>
+        </select>
+      </label>
+    </div>
+    <div class="text-row line2-row">
+      <label>Segunda linha (opcional, com letra menor)
+        <input id="texto2" type="text" value="" maxlength="200" autocomplete="off" placeholder="ex.: 5 ANINHOS · SÁBADO ÀS 15H">
+      </label>
+      <label>Tamanho da segunda linha
+        <select id="tamanho2">
+          <option value="0.35">Bem pequena</option>
+          <option value="0.5">Pequena</option>
+          <option value="0.65" selected>Média</option>
+          <option value="0.8">Quase igual</option>
+          <option value="1">Igual à primeira</option>
+        </select>
+      </label>
+    </div>
+    <div class="fields line2-colors">
+      <label>Cores da segunda linha
+        <select id="cores2">
+          <option value="igual">Iguais às da primeira</option>
+          <option value="propria">Cores próprias</option>
+        </select>
+      </label>
+      <label>Cor do texto (2ª linha)
+        <input id="cor-texto2" type="color" value="#ffffff">
+      </label>
+      <label>Cor secundária (2ª linha)
+        <input id="cor-efeito2" type="color" value="#3ec1d3">
+      </label>
+      <label>Pintura (2ª linha)
+        <select id="pintura2"><option value="igual">Igual à primeira</option></select>
+      </label>
+    </div>
+  </section>
+
+  <section class="win">
+    <h2>[ Letreiro ]</h2>
+    <div class="screen" id="screen">
+      <canvas id="display" aria-label="Letreiro"></canvas>
+      <span class="hint">Esc para sair da tela cheia</span>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="primary" id="btn-full" type="button"><kbd>F11</kbd> Tela cheia</button>
+    <button id="btn-pause" type="button"><kbd>Espaço</kbd> Pausar</button>
+    <button id="btn-random" type="button"><kbd>F5</kbd> Surpresa</button>
+    <button id="btn-auto" type="button"><kbd>F6</kbd> Automático</button>
+  </div>
+  <p class="toast" id="toast" role="status"></p>
+
+  <div class="cols">
+    <section class="win">
+      <h2>[ Letras ]</h2>
+      <div class="fields">
+        <label>Fonte
+          <select id="fonte"></select>
+        </label>
+        <label>Efeito
+          <select id="estilo">
+            <optgroup label="Clássicos">
+              <option value="normal">Normal</option>
+              <option value="sombra">Sombra</option>
+              <option value="sombra-longa">Sombra longa</option>
+              <option value="3d">3D</option>
+              <option value="relevo">Relevo</option>
+              <option value="contorno">Contorno</option>
+              <option value="duplo">Contorno duplo</option>
+              <option value="vazado">Vazado</option>
+            </optgroup>
+            <optgroup label="Luz e brilho">
+              <option value="neon">Neon brilhante</option>
+              <option value="neon-tubo">Neon de tubo (só contorno)</option>
+              <option value="brilhos">Estrelinhas brilhando</option>
+              <option value="fantasma">Fantasma</option>
+              <option value="reflexo">Reflexo no chão</option>
+            </optgroup>
+            <optgroup label="Especiais">
+              <option value="adesivo">Adesivo</option>
+              <option value="quadrinhos">Quadrinhos</option>
+              <option value="rabisco">Rabisco a mão</option>
+              <option value="glitch">Glitch (tela com defeito)</option>
+              <option value="rastro">Rastro</option>
+              <option value="derretendo">Derretendo</option>
+            </optgroup>
+            <optgroup label="Doces e divertidos">
+              <option value="balao">Letras de balão (bexiga)</option>
+              <option value="bala">Bala brilhante</option>
+              <option value="vidro">Vidro</option>
+              <option value="gelo">Gelo com pingentes</option>
+              <option value="chamas">Pegando fogo</option>
+              <option value="costura">Tecido costurado</option>
+            </optgroup>
+            <optgroup label="Sombras e contornos">
+              <option value="sombra-suave">Sombra suave</option>
+              <option value="sombra-dupla">Sombra dupla retrô</option>
+              <option value="sombra-chao">Sombra no chão</option>
+              <option value="contorno-triplo">Contorno triplo</option>
+              <option value="contorno-arcoiris">Contorno arco-íris</option>
+              <option value="3d-arcoiris">3D arco-íris</option>
+              <option value="eco-arcoiris">Eco arco-íris</option>
+            </optgroup>
+            <optgroup label="Animados">
+              <option value="lampadas">Lâmpadas correndo</option>
+              <option value="formigas">Contorno tracejado andando</option>
+              <option value="aura">Aura colorida</option>
+            </optgroup>
+            <optgroup label="Matricial">
+              <option value="pontos">Matricial – pontos</option>
+              <option value="blocos">Matricial – blocos</option>
+              <option value="led">Painel de LED</option>
+            </optgroup>
+          </select>
+        </label>
+        <label>Pintura
+          <select id="pintura">
+            <option value="solida">Cor sólida</option>
+            <option value="degrade">Degradê (2 cores)</option>
+            <option value="arcoiris">Arco-íris</option>
+            <option value="arcoiris-anim">Arco-íris animado</option>
+            <option value="metal">Metal cromado</option>
+            <option value="ouro">Ouro</option>
+            <option value="fogo">Fogo</option>
+            <option value="por-do-sol">Pôr do sol</option>
+            <option value="oceano">Oceano</option>
+            <option value="brilho">Brilho passando</option>
+            <option value="listras">Listras animadas</option>
+            <option value="bolinhas">Bolinhas</option>
+            <option value="xadrez">Xadrez</option>
+          </select>
+        </label>
+        <label>Cada letra
+          <select id="mistura">
+            <option value="iguais">Todas iguais</option>
+            <option value="fontes">Fonte diferente em cada letra</option>
+            <option value="cores">Cor diferente em cada letra</option>
+            <option value="tudo">Fonte e cor diferentes</option>
+          </select>
+        </label>
+        <label>Espaço entre letras <output id="espaco-out"></output>
+          <input id="espaco" type="range" min="0" max="40" step="1" value="4">
+        </label>
+        <label>Cor do texto
+          <input id="cor-texto" type="color" value="#fcfc54">
+        </label>
+        <label>Cor secundária (sombra, brilho, degradê)
+          <input id="cor-efeito" type="color" value="#a80000">
+        </label>
+      </div>
+    </section>
+
+    <section class="win">
+      <h2>[ Animação e cena ]</h2>
+      <div class="fields">
+        <label>Movimento
+          <select id="movimento">
+            <option value="rolar">Rolar para a esquerda</option>
+            <option value="rolar-dir">Rolar para a direita</option>
+            <option value="ioio">Ioiô (vai e volta)</option>
+            <option value="subir">Subir como créditos</option>
+            <option value="parado">Parado no centro</option>
+          </select>
+        </label>
+        <label>Animação das letras
+          <select id="letras">
+            <option value="nenhuma">Nenhuma</option>
+            <option value="mistura">Misturada (cada letra uma)</option>
+            <option value="onda">Onda</option>
+            <option value="pular">Pular</option>
+            <option value="balancar">Balançar</option>
+            <option value="pulsar">Pulsar</option>
+            <option value="girar">Girar (virar)</option>
+            <option value="rodar">Rodar como roda</option>
+            <option value="elastico">Elástico</option>
+            <option value="zoom">Surgir com zoom</option>
+            <option value="tremer">Tremer</option>
+            <option value="cair">Cair do céu</option>
+            <option value="maquina">Máquina de escrever</option>
+            <option value="piscar">Piscar tudo</option>
+            <option value="alternado">Piscar alternado</option>
+          </select>
+        </label>
+        <label>Fundo
+          <select id="fundo">
+            <optgroup label="Simples">
+              <option value="liso">Liso</option>
+              <option value="degrade">Degradê</option>
+              <option value="arcoiris">Cores mudando</option>
+              <option value="estrelas">Céu estrelado</option>
+              <option value="grade">Grade anos 80</option>
+            </optgroup>
+            <optgroup label="Festa">
+              <option value="confete">Confete caindo</option>
+              <option value="baloes">Balões subindo</option>
+              <option value="fogos">Fogos de artifício</option>
+              <option value="serpentinas">Serpentinas</option>
+              <option value="purpurina">Purpurina brilhando</option>
+              <option value="discoteca">Luzes de discoteca</option>
+              <option value="holofotes">Holofotes</option>
+              <option value="bolhas">Bolhas de sabão</option>
+              <option value="coracoes">Corações flutuando</option>
+              <option value="neve">Neve caindo</option>
+              <option value="doces">Doces caindo</option>
+              <option value="petalas">Pétalas caindo</option>
+              <option value="notas">Notas musicais</option>
+              <option value="fogueira">Fogueira</option>
+              <option value="emojis">Emojis de festa</option>
+              <option value="estrelas-caindo">Chuva de estrelas douradas</option>
+            </optgroup>
+            <optgroup label="Balada e palco">
+              <option value="laser">Show de laser</option>
+              <option value="equalizador">Equalizador de som</option>
+              <option value="cortina">Cortina de teatro</option>
+              <option value="flashes">Flashes de câmera</option>
+            </optgroup>
+            <optgroup label="Céu e natureza">
+              <option value="nuvens">Céu com nuvens</option>
+              <option value="cadentes">Estrelas cadentes</option>
+              <option value="vagalumes">Vaga-lumes</option>
+              <option value="aurora">Aurora boreal</option>
+              <option value="ondas">Ondas do mar</option>
+              <option value="chuva">Chuva</option>
+              <option value="tempestade">Tempestade com raios</option>
+              <option value="lua">Lua e estrelas</option>
+              <option value="flocos">Flocos de neve</option>
+              <option value="folhas">Folhas de outono</option>
+            </optgroup>
+            <optgroup label="Infantis">
+              <option value="arcoiris-ceu">Arco-íris no céu</option>
+              <option value="bolinhas">Bolinhas pulando</option>
+              <option value="peixes">Peixinhos nadando</option>
+              <option value="borboletas">Borboletas voando</option>
+              <option value="pipoca">Pipoca estourando</option>
+              <option value="planetas">Planetas girando</option>
+              <option value="circo">Tenda de circo</option>
+              <option value="foguetes">Foguetes decolando</option>
+              <option value="avioes">Aviõezinhos de papel</option>
+              <option value="tinta">Respingos de tinta</option>
+            </optgroup>
+            <optgroup label="Hipnóticos">
+              <option value="raios">Raios de sol girando</option>
+              <option value="espiral">Espiral</option>
+              <option value="bokeh">Luzes desfocadas</option>
+              <option value="dobra">Velocidade da luz</option>
+              <option value="matrix">Chuva de códigos</option>
+              <option value="ondas-cor">Ondas de cor</option>
+              <option value="caleidoscopio">Caleidoscópio</option>
+              <option value="lava">Lâmpada de lava</option>
+              <option value="pista">Pista de dança</option>
+              <option value="plasma">Plasma retrô</option>
+              <option value="tunel">Túnel colorido</option>
+              <option value="ondas-neon">Ondas neon</option>
+              <option value="xadrez-rolando">Xadrez rolando</option>
+            </optgroup>
+          </select>
+        </label>
+        <label>Cor do fundo
+          <input id="cor-fundo" type="color" value="#0000a8">
+        </label>
+        <label>Borda
+          <select id="borda">
+            <optgroup label="Simples">
+              <option value="nenhuma">Nenhuma</option>
+              <option value="simples">Simples</option>
+              <option value="dupla">Dupla</option>
+              <option value="estrelas">Estrelas</option>
+            </optgroup>
+            <optgroup label="Festa">
+              <option value="luzes">Luzes de circo</option>
+              <option value="pisca">Pisca-pisca</option>
+              <option value="bandeirinhas">Bandeirinhas</option>
+              <option value="baloes">Balões nos cantos</option>
+              <option value="confete-borda">Moldura de confete</option>
+              <option value="corrente">Correntinha de papel</option>
+              <option value="laco">Fita com laço de presente</option>
+            </optgroup>
+            <optgroup label="Aniversário e infantil">
+              <option value="velas">Velinhas de aniversário</option>
+              <option value="chapeus">Chapeuzinhos de festa</option>
+              <option value="presentes">Presentes pulando</option>
+              <option value="pirulitos">Pirulitos girando</option>
+              <option value="coroas">Coroas de princesa</option>
+              <option value="raios">Raios de super-herói</option>
+              <option value="estrelas-girando">Estrelas girando</option>
+              <option value="coracoes">Corações pulsando</option>
+              <option value="flores">Flores</option>
+            </optgroup>
+            <optgroup label="Datas">
+              <option value="guirlanda">Guirlanda de Natal</option>
+              <option value="bolas-natal">Bolas de Natal</option>
+              <option value="bengala">Bengala de Natal</option>
+              <option value="aboboras">Abóboras de Halloween</option>
+              <option value="ovos">Ovos de Páscoa</option>
+            </optgroup>
+            <optgroup label="Brilho">
+              <option value="neon-borda">Moldura neon</option>
+              <option value="arcoiris-borda">Moldura arco-íris</option>
+              <option value="cintilantes">Estrelinhas cintilando</option>
+            </optgroup>
+          </select>
+        </label>
+        <label>Velocidade <output id="velocidade-out"></output>
+          <input id="velocidade" type="range" min="1" max="10" step="1" value="4">
+        </label>
+      </div>
+    </section>
+  </div>
+
+  <section class="win">
+    <h2>[ Piloto automático ]</h2>
+    <div class="fields">
+      <label>Piloto automático
+        <select id="auto">
+          <option value="on">Ligado</option>
+          <option value="off">Desligado</option>
+        </select>
+      </label>
+      <label>Trocar a cada <output id="intervalo-out"></output>
+        <input id="intervalo" type="range" min="3" max="30" step="1" value="8">
+      </label>
+      <label>O que sortear
+        <select id="sortear">
+          <option value="tudo">Tudo</option>
+          <option value="animacoes">Só animações e cena</option>
+          <option value="letras">Só o visual das letras</option>
+        </select>
+      </label>
+      <label>Transição
+        <select id="transicao">
+          <option value="sorteada">Sorteada (uma diferente a cada troca)</option>
+          <optgroup label="Suaves">
+            <option value="dissolver">Dissolver</option>
+            <option value="escuro">Apagar e acender</option>
+            <option value="flash">Flash de câmera</option>
+            <option value="zoom">Zoom para fora</option>
+          </optgroup>
+          <optgroup label="Deslizar">
+            <option value="deslizar-esq">Deslizar para a esquerda</option>
+            <option value="deslizar-dir">Deslizar para a direita</option>
+            <option value="subir">Subir</option>
+            <option value="descer">Cair</option>
+            <option value="limpar">Limpador</option>
+            <option value="diagonal">Diagonal</option>
+            <option value="cortina">Cortina de teatro</option>
+          </optgroup>
+          <optgroup label="Formas">
+            <option value="circulo">Círculo abrindo</option>
+            <option value="estrela">Estrela abrindo</option>
+            <option value="coracao">Coração abrindo</option>
+            <option value="persiana">Persiana</option>
+            <option value="persiana-v">Persiana vertical</option>
+            <option value="xadrez">Xadrez</option>
+          </optgroup>
+          <optgroup label="Malucas">
+            <option value="redemoinho">Redemoinho</option>
+            <option value="pixelar">Pixelar</option>
+            <option value="glitch">Glitch</option>
+            <option value="quebrar">Quebrar em pedaços</option>
+          </optgroup>
+        </select>
+      </label>
+      <label>Duração da transição <output id="duracao-out"></output>
+        <input id="duracao" type="range" min="0.3" max="2.5" step="0.1" value="1.2">
+      </label>
+      <label>Embaralhar as letras
+        <select id="embaralhar">
+          <option value="off">Não</option>
+          <option value="lento">A cada 3 segundos</option>
+          <option value="rapido">A cada segundo</option>
+        </select>
+      </label>
+    </div>
+    <div class="auto-row">
+      <p class="auto-status" id="auto-status"></p>
+      <button id="btn-now" type="button">Trocar agora</button>
+    </div>
+  </section>
+</main>
+
+<footer class="statusbar">
+  <span><kbd>F11</kbd> ou duplo clique: Tela cheia</span>
+  <span><kbd>Espaço</kbd> Pausar</span>
+  <span><kbd>F5</kbd> Surpresa</span>
+  <span><kbd>F6</kbd> Automático</span>
+  <span><kbd>Esc</kbd> Sair da tela cheia</span>
+</footer>
+
+<script>
+(() => {
+  const F = (id, group, fallback = "Impact, sans-serif", w = 400) => ({ id, group, w, css: `"${id}", ${fallback}` });
+  const FONTS = [
+    F("Anton", "Impacto"),
+    F("Bebas Neue", "Impacto"),
+    F("Alfa Slab One", "Impacto", "Georgia, serif"),
+    F("Bowlby One SC", "Impacto"),
+    F("Titan One", "Impacto"),
+    F("Russo One", "Impacto"),
+    F("Arial Black", "Impacto", "Arial, sans-serif", 900),
+    F("Oswald", "Impacto", "Impact, sans-serif", 700),
+    F("Passion One", "Impacto", "Impact, sans-serif", 900),
+    F("Staatliches", "Impacto"),
+    F("Teko", "Impacto", "Impact, sans-serif", 700),
+    F("Ultra", "Impacto", "Georgia, serif"),
+    F("Racing Sans One", "Impacto"),
+    F("Knewave", "Impacto"),
+    F("Chewy", "Infantis"),
+    F("Sniglet", "Infantis", "Arial Rounded MT Bold, sans-serif", 800),
+    F("Baloo 2", "Infantis", "Arial Rounded MT Bold, sans-serif", 800),
+    F("Bubblegum Sans", "Infantis"),
+    F("Boogaloo", "Infantis"),
+    F("Coiny", "Infantis"),
+    F("Lilita One", "Infantis"),
+    F("Grandstander", "Infantis", "Arial Rounded MT Bold, sans-serif", 900),
+    F("Mochiy Pop One", "Infantis"),
+    F("Rubik Bubbles", "Infantis"),
+    F("Londrina Solid", "Infantis", "Impact, sans-serif", 900),
+    F("Emilys Candy", "Infantis", "Georgia, serif"),
+    F("Henny Penny", "Infantis", "Georgia, serif"),
+    F("Chicle", "Infantis"),
+    F("Sigmar One", "Infantis"),
+    F("Spicy Rice", "Infantis"),
+    F("Kavoon", "Infantis"),
+    F("Chango", "Infantis"),
+    F("Freckle Face", "Infantis"),
+    F("Fontdiner Swanky", "Infantis"),
+    F("Comic Neue", "Infantis", '"Comic Sans MS", cursive', 700),
+    F("Gochi Hand", "Infantis", '"Comic Sans MS", cursive'),
+    F("Patrick Hand", "Infantis", '"Comic Sans MS", cursive'),
+    F("Bangers", "Divertidas"),
+    F("Luckiest Guy", "Divertidas"),
+    F("Fredoka", "Divertidas", "Arial Rounded MT Bold, sans-serif", 700),
+    F("Bungee", "Divertidas"),
+    F("Bungee Inline", "Divertidas"),
+    F("Bungee Shade", "Divertidas"),
+    F("Shrikhand", "Divertidas", "Georgia, serif"),
+    F("Frijole", "Divertidas"),
+    F("Modak", "Divertidas"),
+    F("Oi", "Divertidas", "Georgia, serif"),
+    F("Rampart One", "Divertidas"),
+    F("Rubik Wet Paint", "Divertidas"),
+    F("Rubik Glitch", "Divertidas"),
+    F("Monofett", "Divertidas"),
+    F("Fascinate", "Divertidas"),
+    F("Mountains of Christmas", "Divertidas", "Georgia, serif", 700),
+    F("Press Start 2P", "Retrô e pixel", '"Courier New", monospace'),
+    F("Silkscreen", "Retrô e pixel", '"Courier New", monospace'),
+    F("VT323", "Retrô e pixel", "Consolas, monospace"),
+    F("Monoton", "Retrô e pixel"),
+    F("Faster One", "Retrô e pixel"),
+    F("Righteous", "Retrô e pixel"),
+    F("Codystar", "Retrô e pixel"),
+    F("Orbitron", "Futuristas", '"Arial Black", sans-serif', 900),
+    F("Audiowide", "Futuristas"),
+    F("Wallpoet", "Futuristas"),
+    F("Black Ops One", "Futuristas"),
+    F("Rubik Mono One", "Futuristas", '"Arial Black", sans-serif'),
+    F("Michroma", "Futuristas"),
+    F("Exo 2", "Futuristas", '"Arial Black", sans-serif', 900),
+    F("Syncopate", "Futuristas", '"Arial Black", sans-serif', 700),
+    F("Major Mono Display", "Futuristas", '"Courier New", monospace'),
+    F("Playfair Display", "Elegantes", "Georgia, serif", 900),
+    F("Abril Fatface", "Elegantes", "Georgia, serif"),
+    F("Cinzel Decorative", "Elegantes", "Georgia, serif", 900),
+    F("UnifrakturMaguntia", "Elegantes", '"Old English Text MT", serif'),
+    F("Limelight", "Elegantes", "Georgia, serif"),
+    F("Poiret One", "Elegantes", "Georgia, serif"),
+    F("Yeseva One", "Elegantes", "Georgia, serif"),
+    F("Diplomata SC", "Elegantes", "Georgia, serif"),
+    F("Lobster Two", "Elegantes", '"Brush Script MT", cursive', 700),
+    F("Lobster", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Pacifico", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Permanent Marker", "Manuscritas", '"Comic Sans MS", cursive'),
+    F("Caveat Brush", "Manuscritas", '"Comic Sans MS", cursive'),
+    F("Special Elite", "Manuscritas", '"Courier New", monospace'),
+    F("Dancing Script", "Manuscritas", '"Brush Script MT", cursive', 700),
+    F("Great Vibes", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Satisfy", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Kaushan Script", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Yellowtail", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Sacramento", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Cookie", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Rye", "Faroeste", "Georgia, serif"),
+    F("Sancreek", "Faroeste", "Georgia, serif"),
+    F("Ewert", "Faroeste", "Georgia, serif"),
+    F("Creepster", "Terror"),
+    F("Nosifer", "Terror"),
+    F("Eater", "Terror"),
+    F("Butcherman", "Terror"),
+    F("Metal Mania", "Terror"),
+    F("Jolly Lodger", "Terror"),
+    F("Griffy", "Terror"),
+    F("Pirata One", "Terror", '"Old English Text MT", serif'),
+    // Third batch
+    F("Archivo Black", "Impacto", '"Arial Black", sans-serif'),
+    F("Black Han Sans", "Impacto"),
+    F("Dela Gothic One", "Impacto"),
+    F("Graduate", "Impacto", "Georgia, serif"),
+    F("Holtwood One SC", "Impacto", "Georgia, serif"),
+    F("Squada One", "Impacto"),
+    F("Bagel Fat One", "Infantis"),
+    F("Carter One", "Infantis"),
+    F("Cherry Bomb One", "Infantis"),
+    F("Darumadrop One", "Infantis"),
+    F("Fuzzy Bubbles", "Infantis", '"Comic Sans MS", cursive', 700),
+    F("Galindo", "Infantis"),
+    F("Lemon", "Infantis"),
+    F("Margarine", "Infantis"),
+    F("Paytone One", "Infantis"),
+    F("Schoolbell", "Infantis", '"Comic Sans MS", cursive'),
+    F("Short Stack", "Infantis", '"Comic Sans MS", cursive'),
+    F("Fredericka the Great", "Divertidas", "Georgia, serif"),
+    F("Kablammo", "Divertidas"),
+    F("Plaster", "Divertidas"),
+    F("Ribeye Marrow", "Divertidas"),
+    F("Rubik Doodle Shadow", "Divertidas"),
+    F("Rubik Maze", "Divertidas"),
+    F("Rubik Microbe", "Divertidas"),
+    F("Rubik Moonrocks", "Divertidas"),
+    F("Rubik Vinyl", "Divertidas"),
+    F("Vast Shadow", "Divertidas", "Georgia, serif"),
+    F("Zen Tokyo Zoo", "Divertidas"),
+    F("Bungee Outline", "Retrô e pixel"),
+    F("DotGothic16", "Retrô e pixel", '"Courier New", monospace'),
+    F("Neonderthaw", "Retrô e pixel", '"Brush Script MT", cursive'),
+    F("Nova Square", "Retrô e pixel"),
+    F("Pixelify Sans", "Retrô e pixel", '"Courier New", monospace', 700),
+    F("Tilt Neon", "Retrô e pixel"),
+    F("Tilt Prism", "Retrô e pixel"),
+    F("Tilt Warp", "Retrô e pixel"),
+    F("Train One", "Retrô e pixel"),
+    F("Aldrich", "Futuristas"),
+    F("Bruno Ace SC", "Futuristas"),
+    F("Oxanium", "Futuristas", '"Arial Black", sans-serif', 800),
+    F("Quantico", "Futuristas", '"Arial Black", sans-serif', 700),
+    F("Turret Road", "Futuristas", '"Arial Black", sans-serif', 800),
+    F("Zen Dots", "Futuristas"),
+    F("Aboreto", "Elegantes", "Georgia, serif"),
+    F("Bodoni Moda", "Elegantes", "Georgia, serif", 900),
+    F("Italiana", "Elegantes", "Georgia, serif"),
+    F("Marcellus", "Elegantes", "Georgia, serif"),
+    F("Alex Brush", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Allura", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Parisienne", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Pinyon Script", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Playball", "Manuscritas", '"Brush Script MT", cursive'),
+    F("Homemade Apple", "Manuscritas", '"Comic Sans MS", cursive'),
+    F("Indie Flower", "Manuscritas", '"Comic Sans MS", cursive'),
+    F("Shadows Into Light", "Manuscritas", '"Comic Sans MS", cursive'),
+    F("Amatic SC", "Manuscritas", '"Comic Sans MS", cursive', 700),
+    F("Sriracha", "Manuscritas", '"Comic Sans MS", cursive'),
+    F("Smokum", "Faroeste", "Georgia, serif"),
+    F("Sedgwick Ave Display", "Grafite", '"Comic Sans MS", cursive'),
+    F("Rubik Spray Paint", "Grafite"),
+    F("Rock Salt", "Grafite", '"Comic Sans MS", cursive'),
+  ];
+  const PRESETS = {
+    aniversario: { texto: "FELIZ ANIVERSÁRIO!", fonte: "Bungee", estilo: "3d", pintura: "arcoiris-anim", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#2a0a4a", movimento: "parado", letras: "pular", fundo: "confete", "cor-fundo": "#1b0b5a", borda: "luzes", velocidade: 4 },
+    // Festas infantis
+    infantil: { texto: "PARABÉNS!", texto2: "5 ANINHOS DE MUITA ALEGRIA", tamanho2: 0.5, fonte: "Chewy", estilo: "adesivo", pintura: "solida", mistura: "cores", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "pular", fundo: "baloes", "cor-fundo": "#23145c", borda: "bandeirinhas", velocidade: 4 },
+    heroi: { texto: "HERÓIS EM AÇÃO!", texto2: "O PODER DA DIVERSÃO", tamanho2: 0.45, fonte: "Bangers", estilo: "quadrinhos", pintura: "solida", espaco: 6, "cor-texto": "#ffd23f", "cor-efeito": "#d0021b", movimento: "parado", letras: "zoom", fundo: "holofotes", "cor-fundo": "#0b1d4a", borda: "estrelas-girando", velocidade: 5 },
+    princesa: { texto: "Festa da Princesa", texto2: "UM DIA DE CONTO DE FADAS", tamanho2: 0.45, fonte: "Emilys Candy", estilo: "brilhos", pintura: "degrade", espaco: 3, "cor-texto": "#ffb3de", "cor-efeito": "#b983ff", movimento: "parado", letras: "onda", fundo: "purpurina", "cor-fundo": "#3a0f3f", borda: "flores", velocidade: 3 },
+    mar: { texto: "FUNDO DO MAR", texto2: "VEM MERGULHAR COM A GENTE!", tamanho2: 0.5, fonte: "Chewy", estilo: "sombra", pintura: "oceano", espaco: 4, "cor-texto": "#caf0f8", "cor-efeito": "#012a4a", movimento: "parado", letras: "onda", fundo: "bolhas", "cor-fundo": "#01497c", borda: "nenhuma", velocidade: 3 },
+    dino: { texto: "DINO FESTA!", texto2: "RAAAWR! CHEGOU A HORA", tamanho2: 0.5, fonte: "Rubik Wet Paint", estilo: "3d", pintura: "solida", espaco: 4, "cor-texto": "#9be15d", "cor-efeito": "#1b4d1b", movimento: "parado", letras: "tremer", fundo: "confete", "cor-fundo": "#16301a", borda: "estrelas", velocidade: 5 },
+    circo: { texto: "O CIRCO CHEGOU!", texto2: "RESPEITÁVEL PÚBLICO", tamanho2: 0.45, fonte: "Sancreek", estilo: "3d", pintura: "solida", espaco: 4, "cor-texto": "#ffd23f", "cor-efeito": "#b30019", movimento: "parado", letras: "pular", fundo: "holofotes", "cor-fundo": "#2a0508", borda: "luzes", velocidade: 4 },
+    espaco: { texto: "MISSÃO ESPACIAL", texto2: "3… 2… 1… DECOLAR!", tamanho2: 0.5, fonte: "Audiowide", estilo: "neon", pintura: "solida", espaco: 6, "cor-texto": "#e0f7ff", "cor-efeito": "#3ec1d3", movimento: "parado", letras: "cair", fundo: "estrelas", "cor-fundo": "#03030f", borda: "estrelas-girando", velocidade: 4 },
+    pijama: { texto: "FESTA DO PIJAMA", texto2: "TRAGA SEU TRAVESSEIRO!", tamanho2: 0.5, fonte: "Sniglet", estilo: "adesivo", pintura: "arcoiris", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "balancar", fundo: "estrelas", "cor-fundo": "#1b1446", borda: "nenhuma", velocidade: 3 },
+    criancas: { texto: "FELIZ DIA DAS CRIANÇAS", texto2: "BRINCAR É COISA SÉRIA!", tamanho2: 0.5, fonte: "Lilita One", estilo: "adesivo", pintura: "solida", mistura: "tudo", espaco: 3, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "mistura", fundo: "confete", "cor-fundo": "#0f3b7a", borda: "baloes", velocidade: 4 },
+    // Datas
+    carnaval: { texto: "É CARNAVAL!", texto2: "ALEGRIA SEM FIM", tamanho2: 0.5, fonte: "Chango", estilo: "sombra", pintura: "arcoiris-anim", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#3a0070", movimento: "parado", letras: "pular", fundo: "serpentinas", "cor-fundo": "#2b0a4a", borda: "luzes", velocidade: 6 },
+    pascoa: { texto: "FELIZ PÁSCOA", texto2: "RENOVAÇÃO E ESPERANÇA", tamanho2: 0.45, fonte: "Chewy", estilo: "adesivo", pintura: "arcoiris", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#ffffff", movimento: "parado", letras: "pular", fundo: "bolhas", "cor-fundo": "#2e6f4e", borda: "flores", velocidade: 3 },
+    halloween: { texto: "HALLOWEEN", texto2: "DOCES OU TRAVESSURAS?", tamanho2: 0.5, fonte: "Creepster", estilo: "derretendo", pintura: "degrade", espaco: 4, "cor-texto": "#ffa500", "cor-efeito": "#b33c00", movimento: "parado", letras: "nenhuma", fundo: "estrelas", "cor-fundo": "#140a1f", borda: "nenhuma", velocidade: 4 },
+    // Eventos
+    casamento: { texto: "Felicidades aos noivos", texto2: "COM AMOR, FAMÍLIA E AMIGOS", tamanho2: 0.35, fonte: "Great Vibes", estilo: "brilhos", pintura: "ouro", espaco: 2, "cor-texto": "#f5d68a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "nenhuma", fundo: "purpurina", "cor-fundo": "#1e1418", borda: "flores", velocidade: 3 },
+    formatura: { texto: "PARABÉNS, FORMANDOS!", texto2: "TURMA 2026", tamanho2: 0.5, fonte: "Playfair Display", estilo: "reflexo", pintura: "ouro", espaco: 4, "cor-texto": "#f2c14e", "cor-efeito": "#8a5a12", movimento: "parado", letras: "zoom", fundo: "fogos", "cor-fundo": "#050a1f", borda: "estrelas-girando", velocidade: 4 },
+    boasvindas: { texto: "SEJAM BEM-VINDOS!", texto2: "É UMA ALEGRIA TER VOCÊ AQUI", tamanho2: 0.45, fonte: "Oswald", estilo: "sombra", pintura: "brilho", espaco: 6, "cor-texto": "#ffffff", "cor-efeito": "#0b3d91", movimento: "parado", letras: "nenhuma", fundo: "holofotes", "cor-fundo": "#0a1633", borda: "nenhuma", velocidade: 4 },
+    inauguracao: { texto: "GRANDE INAUGURAÇÃO", texto2: "PROMOÇÕES ESPECIAIS HOJE", tamanho2: 0.5, fonte: "Passion One", estilo: "3d", pintura: "solida", espaco: 4, "cor-texto": "#ffd23f", "cor-efeito": "#b30019", movimento: "rolar", letras: "nenhuma", fundo: "fogos", "cor-fundo": "#140404", borda: "luzes", velocidade: 4 },
+    culto: { texto: "SEJAM BEM-VINDOS", texto2: "QUE BOM QUE VOCÊ VEIO", tamanho2: 0.45, fonte: "Cinzel Decorative", estilo: "brilhos", pintura: "ouro", espaco: 4, "cor-texto": "#ffe08a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "nenhuma", fundo: "estrelas", "cor-fundo": "#0d1026", borda: "nenhuma", velocidade: 3 },
+    junina: { texto: "ARRAIÁ!", fonte: "Rye", estilo: "sombra", pintura: "por-do-sol", espaco: 6, "cor-texto": "#ffd23f", "cor-efeito": "#5a2600", movimento: "parado", letras: "balancar", fundo: "fogos", "cor-fundo": "#1f0d2e", borda: "bandeirinhas", velocidade: 4 },
+    natal: { texto: "FELIZ NATAL", fonte: "Cinzel Decorative", estilo: "brilhos", pintura: "ouro", espaco: 6, "cor-texto": "#ffe08a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "onda", fundo: "neve", "cor-fundo": "#0b3d2e", borda: "pisca", velocidade: 3 },
+    anonovo: { texto: "FELIZ ANO NOVO!", fonte: "Playfair Display", estilo: "reflexo", pintura: "brilho", espaco: 4, "cor-texto": "#f2c14e", "cor-efeito": "#ffffff", movimento: "parado", letras: "zoom", fundo: "fogos", "cor-fundo": "#05060f", borda: "estrelas-girando", velocidade: 4 },
+    namorados: { texto: "EU TE AMO", fonte: "Pacifico", estilo: "neon", pintura: "solida", espaco: 3, "cor-texto": "#ffd6e5", "cor-efeito": "#ff2d6f", movimento: "parado", letras: "pulsar", fundo: "coracoes", "cor-fundo": "#2a0010", borda: "coracoes", velocidade: 3 },
+    balada: { texto: "BORA DANÇAR!", fonte: "Audiowide", estilo: "neon", pintura: "arcoiris-anim", espaco: 4, "cor-texto": "#ffffff", "cor-efeito": "#b983ff", movimento: "parado", letras: "pulsar", fundo: "discoteca", "cor-fundo": "#0a0014", borda: "pisca", velocidade: 6 },
+    cha: { texto: "BEM-VINDO, BEBÊ!", fonte: "Fredoka", estilo: "adesivo", pintura: "solida", espaco: 4, "cor-texto": "#6ec6ff", "cor-efeito": "#ffffff", movimento: "parado", letras: "pular", fundo: "baloes", "cor-fundo": "#2b3a67", borda: "flores", velocidade: 3 },
+    neon: { texto: "Aberto", fonte: "Pacifico", estilo: "neon", pintura: "solida", espaco: 2, "cor-texto": "#ffd6f5", "cor-efeito": "#ff2bd6", movimento: "parado", letras: "nenhuma", fundo: "liso", "cor-fundo": "#0b0612", borda: "nenhuma", velocidade: 3 },
+    led: { texto: "PROMOÇÃO HOJE ★ TUDO COM 20% ★", fonte: "Arial Black", estilo: "led", pintura: "solida", espaco: 8, "cor-texto": "#ff5a1f", "cor-efeito": "#ff5a1f", movimento: "rolar", letras: "nenhuma", fundo: "liso", "cor-fundo": "#070707", borda: "nenhuma", velocidade: 5 },
+    anos80: { texto: "RADICAL!", fonte: "Orbitron", estilo: "3d", pintura: "metal", espaco: 6, "cor-texto": "#ffffff", "cor-efeito": "#ff2bd6", movimento: "parado", letras: "onda", fundo: "grade", "cor-fundo": "#12002e", borda: "nenhuma", velocidade: 4 },
+    fogo: { texto: "PERIGO", fonte: "Black Ops One", estilo: "normal", pintura: "fogo", espaco: 6, "cor-texto": "#ffcc00", "cor-efeito": "#ff3300", movimento: "parado", letras: "tremer", fundo: "liso", "cor-fundo": "#000000", borda: "nenhuma", velocidade: 5 },
+    terror: { texto: "NÃO OLHE PARA TRÁS", fonte: "Creepster", estilo: "sombra", pintura: "degrade", espaco: 4, "cor-texto": "#c8ff3c", "cor-efeito": "#3a0000", movimento: "rolar", letras: "balancar", fundo: "degrade", "cor-fundo": "#050805", borda: "nenhuma", velocidade: 3 },
+    maquina: { texto: "Era uma vez...", fonte: "VT323", estilo: "normal", pintura: "solida", espaco: 2, "cor-texto": "#33ff66", "cor-efeito": "#0b3d18", movimento: "parado", letras: "maquina", fundo: "liso", "cor-fundo": "#000000", borda: "dupla", velocidade: 4 },
+    gibi: { texto: "POW! KABUM!", fonte: "Bangers", estilo: "quadrinhos", pintura: "solida", espaco: 6, "cor-texto": "#ffd23f", "cor-efeito": "#ff3b3b", movimento: "parado", letras: "elastico", fundo: "degrade", "cor-fundo": "#1e6fd9", borda: "nenhuma", velocidade: 5 },
+    gosma: { texto: "HALLOWEEN", fonte: "Nosifer", estilo: "derretendo", pintura: "degrade", espaco: 4, "cor-texto": "#9dff3c", "cor-efeito": "#2f7d00", movimento: "parado", letras: "nenhuma", fundo: "estrelas", "cor-fundo": "#14001f", borda: "nenhuma", velocidade: 4 },
+    cinema: { texto: "ESTREIA", fonte: "Abril Fatface", estilo: "reflexo", pintura: "ouro", espaco: 10, "cor-texto": "#ffe08a", "cor-efeito": "#8a5a12", movimento: "parado", letras: "zoom", fundo: "estrelas", "cor-fundo": "#05060f", borda: "luzes", velocidade: 4 },
+    dos: { texto: "FELIZ ANIVERSÁRIO!", fonte: "Anton", estilo: "sombra", pintura: "solida", espaco: 4, "cor-texto": "#fcfc54", "cor-efeito": "#a80000", movimento: "rolar", letras: "nenhuma", fundo: "liso", "cor-fundo": "#0000a8", borda: "dupla", velocidade: 4 },
+  };
+  // Presets whose second line has its own colours: [text, secondary, paint].
+  const LINE2_COLORS = {
+    infantil: ["#ffd23f", "#ffffff", "solida"],
+    heroi: ["#ffffff", "#0b1d4a", "solida"],
+    princesa: ["#ffffff", "#ff7eb6", "solida"],
+    dino: ["#ffd23f", "#1b4d1b", "solida"],
+    circo: ["#ffffff", "#b30019", "solida"],
+    criancas: ["#ffd23f", "#ffffff", "arcoiris-anim"],
+    carnaval: ["#ffd23f", "#3a0070", "solida"],
+    halloween: ["#b983ff", "#3a0070", "solida"],
+    casamento: ["#ffffff", "#8a5a12", "solida"],
+    formatura: ["#ffffff", "#8a5a12", "metal"],
+    inauguracao: ["#ffffff", "#b30019", "solida"],
+  };
+  for (const [k, [a, b, p]] of Object.entries(LINE2_COLORS))
+    Object.assign(PRESETS[k], { cores2: "propria", "cor-texto2": a, "cor-efeito2": b, pintura2: p });
+
+  // Themed borders for the presets that have a matching one.
+  const PRESET_BORDERS = {
+    aniversario: "velas", heroi: "raios", princesa: "coroas", halloween: "aboboras", pascoa: "ovos",
+    criancas: "corrente", pijama: "cintilantes", balada: "neon-borda",
+  };
+  for (const [k, b] of Object.entries(PRESET_BORDERS)) PRESETS[k].borda = b;
+  const PRESET_SCENES = {
+    mar: "peixes", circo: "circo", espaco: "planetas", pascoa: "arcoiris-ceu",
+    balada: "laser", cinema: "cortina", pijama: "lua", inauguracao: "flashes",
+  };
+  for (const [k, s] of Object.entries(PRESET_SCENES)) PRESETS[k].fundo = s;
+
+  const REF = 100;
+  const $ = (id) => document.getElementById(id);
+  const IDS = ["texto", "texto2", "tamanho2", "cores2", "cor-texto2", "cor-efeito2", "pintura2", "fonte", "estilo", "pintura", "mistura", "espaco", "cor-texto", "cor-efeito", "movimento", "letras", "fundo", "cor-fundo", "borda", "velocidade"];
+  const AUTO_IDS = ["auto", "intervalo", "sortear", "transicao", "duracao", "embaralhar"];
+  const STORE = "banner-exe-tela-v4"; // old internal name kept so saved settings survive the rename
+  let mixSeed = 1 + Math.floor(Math.random() * 9999);
+
+  // The second line's paint list mirrors the first one's.
+  for (const o of $("pintura").options) $("pintura2").appendChild(new Option(o.textContent, o.value));
+
+  const fontSel = $("fonte");
+  for (const f of FONTS) {
+    let grp = [...fontSel.children].find((g) => g.label === f.group);
+    if (!grp) { grp = document.createElement("optgroup"); grp.label = f.group; fontSel.appendChild(grp); }
+    const o = document.createElement("option");
+    o.value = f.id; o.textContent = f.id;
+    grp.appendChild(o);
+  }
+
+  function applyValues(obj) {
+    for (const id of IDS.concat(AUTO_IDS)) if (obj[id] != null) $(id).value = obj[id];
+  }
+  applyValues(PRESETS.dos);
+  $("movimento").value = "rolar";
+  $("letras").value = "onda";
+  let hasSaved = false;
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (saved) { applyValues(saved); hasSaved = true; }
+  } catch (e) {}
+  function save() {
+    try {
+      const o = {};
+      for (const id of IDS.concat(AUTO_IDS)) o[id] = $(id).value;
+      localStorage.setItem(STORE, JSON.stringify(o));
+    } catch (e) {}
+  }
+
+  function readState() {
+    return {
+      text: $("texto").value,
+      text2: $("texto2").value,
+      size2: +$("tamanho2").value,
+      own2: $("cores2").value === "propria",
+      fg2: $("cor-texto2").value,
+      fx2: $("cor-efeito2").value,
+      paint2: $("pintura2").value,
+      font: $("fonte").value,
+      style: $("estilo").value,
+      paint: $("pintura").value,
+      spacing: +$("espaco").value,
+      fg: $("cor-texto").value,
+      fx: $("cor-efeito").value,
+      mov: $("movimento").value,
+      letters: $("letras").value,
+      scene: $("fundo").value,
+      bg: $("cor-fundo").value,
+      border: $("borda").value,
+      speed: +$("velocidade").value,
+      mix: $("mistura").value,
+      auto: $("auto").value === "on",
+      interval: +$("intervalo").value,
+      scope: $("sortear").value,
+      shuffle: $("embaralhar").value,
+    };
+  }
+
+  // The settings the second line is drawn with: its own colours and paint when chosen.
+  // Its own colours replace the per-letter colours, but keep per-letter fonts.
+  function line2State(st) {
+    if (!st.own2) return st;
+    const mix = st.mix === "tudo" ? "fontes" : st.mix === "cores" ? "iguais" : st.mix;
+    return { ...st, fg: st.fg2, fx: st.fx2, paint: st.paint2 === "igual" ? st.paint : st.paint2, mix };
+  }
+
+  // Per-letter font / colour, stable for a given mixSeed.
+  const mixFonts = (st) => st.mix === "fontes" || st.mix === "tudo";
+  const mixColors = (st) => st.mix === "cores" || st.mix === "tudo";
+  function glyphFont(st, i) {
+    if (!mixFonts(st)) return st.font;
+    return FONTS[Math.floor(rnd(mixSeed * 101 + i * 17.3) * FONTS.length)].id;
+  }
+  function glyphColor(i) {
+    const h = (i * 67 + rnd(mixSeed * 3.7) * 360 + rnd(mixSeed + i) * 30) % 360;
+    return `hsl(${h.toFixed(0)} 92% 60%)`;
+  }
+
+  const fontSpec = (id, size) => {
+    const f = FONTS.find((x) => x.id === id) || FONTS[0];
+    return `${f.w} ${size}px ${f.css}`;
+  };
+  const setSpacing = (ctx, v) => { if ("letterSpacing" in ctx) ctx.letterSpacing = v + "px"; };
+  const isMatrix = (s) => s === "pontos" || s === "blocos" || s === "led";
+  const rnd = (a) => { const x = Math.sin(a * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+  // ---------- measuring ----------
+  const mctx = document.createElement("canvas").getContext("2d");
+  const maskCanvas = document.createElement("canvas");
+  const maskCtx = maskCanvas.getContext("2d", { willReadFrequently: true });
+
+  // Measures each letter on its own (letters may use different fonts), at font size REF.
+  function measureGlyphs(st, glyphs, gOff) {
+    const sp = (st.spacing / 100) * REF;
+    const xs = [0];
+    let asc = 0, desc = 0, left = -Infinity, right = -Infinity;
+    setSpacing(mctx, 0);
+    glyphs.forEach((g, i) => {
+      mctx.font = fontSpec(glyphFont(st, i + gOff), REF);
+      const m = mctx.measureText(g);
+      if (g.trim()) {
+        asc = Math.max(asc, m.actualBoundingBoxAscent);
+        desc = Math.max(desc, m.actualBoundingBoxDescent);
+        left = Math.max(left, m.actualBoundingBoxLeft - xs[i]);
+        right = Math.max(right, xs[i] + m.actualBoundingBoxRight);
+      }
+      xs.push(xs[i] + m.width + sp);
+    });
+    if (!isFinite(left)) { left = 0; right = 0; }
+    return { xs, asc, desc, left, right };
+  }
+
+  const maskCacheMap = new Map();
+  function buildMask(st, text, gOff, m) {
+    const key = [text, gOff, st.font, st.spacing, st.mix, mixSeed].join("|");
+    if (maskCacheMap.has(key)) return maskCacheMap.get(key);
+    const R = 16, SS = 5, hpx = R * SS;
+    const s = hpx / Math.max(1, m.asc + m.desc);
+    const size = REF * s;
+    const cols = Math.max(1, Math.ceil(((m.left + m.right) * s) / SS) + 1);
+    maskCanvas.width = cols * SS;
+    maskCanvas.height = hpx;
+    setSpacing(maskCtx, 0);
+    maskCtx.fillStyle = "#000";
+    const glyphs = Array.from(text);
+    const xs = m.xs.map((v) => v * s + m.left * s);
+    glyphs.forEach((g, i) => {
+      maskCtx.font = fontSpec(glyphFont(st, i + gOff), size);
+      maskCtx.fillText(g, xs[i], m.asc * s);
+    });
+    const n = glyphs.length;
+    const centers = glyphs.map((_, i) => (xs[i] + xs[i + 1]) / 2 / SS);
+    const byGlyph = glyphs.map(() => []);
+
+    const data = maskCtx.getImageData(0, 0, maskCanvas.width, hpx).data;
+    for (let c = 0; c < cols; c++) {
+      const xc = c * SS + SS / 2;
+      let gi = 0;
+      while (gi < n - 1 && xs[gi + 1] <= xc) gi++;
+      for (let r = 0; r < R; r++) {
+        let sum = 0;
+        for (let y = 0; y < SS; y++)
+          for (let x = 0; x < SS; x++)
+            sum += data[((r * SS + y) * maskCanvas.width + c * SS + x) * 4 + 3];
+        if (sum / (SS * SS) > 255 * 0.38) byGlyph[gi].push(c, r);
+      }
+    }
+    const mask = { cols, rows: R, n, centers, byGlyph };
+    if (maskCacheMap.size > 8) maskCacheMap.clear();
+    maskCacheMap.set(key, mask);
+    return mask;
+  }
+
+  const RESERVE = { mistura: 0.76, onda: 0.76, pular: 0.76, balancar: 0.84, pulsar: 0.86, tremer: 0.92, rodar: 0.8, elastico: 0.8 };
+
+  // Layout in CSS pixels for a W×H screen: one or two lines, each a self-contained line object.
+  // When fitWidth is set, the whole block shrinks to fit the width.
+  function layout(st, W, H, fitWidth) {
+    const bw = {
+      nenhuma: 0, simples: 0.035, dupla: 0.08, estrelas: 0.12, luzes: 0.1, pisca: 0.13, bandeirinhas: 0.17,
+      baloes: 0.06, "estrelas-girando": 0.12, coracoes: 0.12, flores: 0.12, bengala: 0.06,
+      "confete-borda": 0.08, corrente: 0.1, laco: 0.06, velas: 0.19, chapeus: 0.17, presentes: 0.16,
+      pirulitos: 0.13, coroas: 0.12, raios: 0.12, guirlanda: 0.13, "bolas-natal": 0.2, aboboras: 0.13,
+      ovos: 0.13, "neon-borda": 0.05, "arcoiris-borda": 0.05, cintilantes: 0.09,
+    }[st.border] || 0;
+    const B = bw * H;
+    const pad = H * 0.07;
+    const innerH = (H - 2 * (B + pad)) * (RESERVE[st.letters] || 1);
+    const availW = W - 2 * (B + pad);
+    const text1 = st.text, text2 = st.text2.trim() ? st.text2 : "";
+    const n1 = Array.from(text1).length;
+    const nTotal = n1 + Array.from(text2).length;
+    const ratio = text2 ? (st.style === "led" ? 1 : st.size2) : 0;
+
+    const makeLines = (boxH) => {
+      if (!text2) return [buildLine(st, text1, 0, boxH, nTotal)];
+      const gap = boxH * 0.07;
+      const h1 = (boxH - gap) / (1 + ratio);
+      const a = buildLine(st, text1, 0, h1, nTotal);
+      const b = buildLine(st, text2, n1, h1 * ratio, nTotal);
+      a.gap = a.cell ? Math.max(1, Math.round(gap / a.cell)) * a.cell : gap;
+      return [a, b];
+    };
+
+    let lines = makeLines(innerH);
+    let blockW = Math.max(...lines.map((l) => l.textW));
+    if (fitWidth && blockW > availW && blockW > 0) {
+      lines = makeLines(innerH * (availW / blockW));
+      blockW = Math.max(...lines.map((l) => l.textW));
+    }
+    const total = lines.reduce((s, l) => s + l.boxH, 0) + (lines[0].gap || 0);
+    let y = (H - total) / 2;
+    for (const l of lines) {
+      Object.assign(l, { W, H, B, dx: (blockW - l.textW) / 2 });
+      l.y0 = y + l.above; // y0 is the top of the letters; room for flames sits above it
+      y += l.boxH + (l.gap || 0);
+    }
+    return { W, H, B, lines, textW: blockW, cell: lines[0].cell, y0: lines[0].y0 };
+  }
+
+  // Draws text with a white-to-clear gradient over its top half: a glossy, candy-like shine.
+  function gloss(ctx, g, x, y, L, strength = 0.7) {
+    const top = y - L.asc;
+    const gr = ctx.createLinearGradient(0, top, 0, top + L.textH * 0.55);
+    gr.addColorStop(0, `rgba(255, 255, 255, ${strength})`);
+    gr.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = gr;
+    ctx.fillText(g, x, y);
+  }
+
+  function buildLine(st, text, gOff, lineH, nTotal) {
+    const glyphs = Array.from(text);
+    const L = { glyphs, gOff, nTotal, empty: !text.trim() };
+
+    const effect = (h) => {
+      switch (st.style) {
+        case "sombra": return { off: h * 0.05, extra: h * 0.05, sw: 0, shift: 0 };
+        case "3d": return { off: h * 0.1, extra: h * 0.1, sw: 0, shift: 0 };
+        case "contorno": return { off: 0, extra: h * 0.056, sw: h * 0.028, shift: h * 0.028 };
+        case "duplo": return { off: 0, extra: h * 0.1, sw: h * 0.025, shift: h * 0.05 };
+        case "vazado": return { off: 0, extra: h * 0.022, sw: h * 0.022, shift: h * 0.011 };
+        case "sombra-longa": return { off: h * 0.22, extra: h * 0.22, sw: 0, shift: 0 };
+        case "relevo": return { off: h * 0.018, extra: h * 0.036, sw: 0, shift: h * 0.018 };
+        case "neon-tubo": return { off: 0, extra: h * 0.03, sw: h * 0.02, shift: h * 0.015 };
+        case "adesivo": return { off: h * 0.035, extra: h * 0.135, sw: h * 0.05, shift: h * 0.05 };
+        case "quadrinhos": return { off: h * 0.06, extra: h * 0.11, sw: h * 0.025, shift: h * 0.025 };
+        case "rabisco": return { off: 0, extra: h * 0.04, sw: h * 0.012, shift: h * 0.02 };
+        case "glitch": return { off: h * 0.025, extra: h * 0.05, sw: 0, shift: h * 0.025 };
+        case "reflexo": return { off: 0, extra: 0, sw: 0, shift: 0, below: h * 0.3 };
+        case "derretendo": return { off: 0, extra: 0, sw: 0, shift: 0, below: h * 0.28 };
+        case "balao": return { off: 0, extra: h * 0.12, sw: h * 0.06, shift: h * 0.06 };
+        case "vidro": return { off: 0, extra: h * 0.04, sw: h * 0.02, shift: h * 0.02 };
+        case "sombra-suave": return { off: h * 0.04, extra: h * 0.08, sw: 0, shift: 0 };
+        case "sombra-dupla": return { off: h * 0.04, extra: h * 0.08, sw: 0, shift: 0 };
+        case "sombra-chao": return { off: 0, extra: 0, sw: 0, shift: 0, below: h * 0.3 };
+        case "contorno-arcoiris": return { off: 0, extra: h * 0.12, sw: h * 0.015, shift: h * 0.06 };
+        case "contorno-triplo": return { off: 0, extra: h * 0.12, sw: h * 0.02, shift: h * 0.06 };
+        case "lampadas": return { off: 0, extra: h * 0.05, sw: h * 0.05, shift: h * 0.025 };
+        case "formigas": return { off: 0, extra: h * 0.025, sw: h * 0.025, shift: h * 0.0125 };
+        case "3d-arcoiris": return { off: h * 0.12, extra: h * 0.12, sw: 0, shift: 0 };
+        case "eco-arcoiris": return { off: h * 0.035, extra: h * 0.18, sw: 0, shift: 0 };
+        case "gelo": return { off: 0, extra: h * 0.02, sw: h * 0.02, shift: h * 0.01, below: h * 0.2 };
+        case "chamas": return { off: 0, extra: 0, sw: 0, shift: 0, above: h * 0.28 };
+        default: return { off: 0, extra: 0, sw: 0, shift: 0 };
+      }
+    };
+
+    const build = (boxH) => {
+      const e = effect(boxH);
+      e.below = e.below || 0;
+      e.above = e.above || 0;
+      Object.assign(L, e);
+      const textH = boxH - e.extra - e.below - e.above;
+      let textW = 0;
+      if (!L.empty) {
+        const met = measureGlyphs(st, glyphs, gOff);
+        if (isMatrix(st.style)) {
+          L.mask = buildMask(st, text, gOff, met);
+          L.cell = textH / L.mask.rows;
+          textW = L.mask.cols * L.cell;
+        } else {
+          const s = textH / Math.max(1, met.asc + met.desc);
+          L.size = REF * s;
+          L.asc = met.asc * s;
+          L.left = met.left * s;
+          L.spacingPx = (st.spacing / 100) * L.size;
+          L.xs = met.xs.map((v) => v * s);
+          textW = (met.left + met.right) * s;
+        }
+      }
+      L.textH = textH;
+      L.textW = textW + e.extra;
+      L.boxH = boxH;
+    };
+
+    build(lineH);
+    return L;
+  }
+
+  // ---------- per-letter animation ----------
+  function easeOutBounce(x) {
+    const n1 = 7.5625, d1 = 2.75;
+    if (x < 1 / d1) return n1 * x * x;
+    if (x < 2 / d1) return n1 * (x -= 1.5 / d1) * x + 0.75;
+    if (x < 2.5 / d1) return n1 * (x -= 2.25 / d1) * x + 0.9375;
+    return n1 * (x -= 2.625 / d1) * x + 0.984375;
+  }
+
+  const MIX_ANIMS = ["onda", "pular", "balancar", "pulsar", "girar", "tremer", "alternado", "rodar", "elastico"];
+  const easeOutBack = (x) => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+
+  function letterT(st, L, i, n, t) {
+    const sp = 0.5 + st.speed * 0.3;
+    const A = L.textH * 0.14;
+    const r = { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, alpha: 1, show: true };
+    let kind = st.letters;
+    if (kind === "mistura") kind = MIX_ANIMS[Math.floor(rnd(mixSeed * 29 + i * 5.1) * MIX_ANIMS.length)];
+    switch (kind) {
+      case "onda": r.dy = Math.sin(t * sp * 2.4 - i * 0.55) * A; break;
+      case "pular": r.dy = A * 0.9 - Math.abs(Math.sin(t * sp * 1.7 - i * 0.45)) * A * 1.8; break;
+      case "balancar": r.rot = Math.sin(t * sp * 2 - i * 0.6) * 0.22; break;
+      case "pulsar": { const k = 1 + 0.1 * Math.sin(t * sp * 2.6 - i * 0.5); r.sx = r.sy = k; break; }
+      case "girar": r.sx = Math.cos(t * sp * 1.4 - i * 0.3); break;
+      case "rodar": r.rot = (t * sp * 1.8 - i * 0.5) % (Math.PI * 2); break;
+      case "elastico": {
+        const k = Math.sin(t * sp * 3 - i * 0.5);
+        r.sy = 1 + 0.22 * k; r.sx = 1 - 0.14 * k;
+        break;
+      }
+      case "zoom": {
+        const step = 0.35 / sp, dur = 0.6;
+        const cycle = n * step + dur + 2.5;
+        const ph = (t % cycle) - i * step;
+        if (ph < 0) { r.show = false; break; }
+        r.sx = r.sy = Math.max(0.001, easeOutBack(Math.min(1, ph / dur)));
+        break;
+      }
+      case "tremer": {
+        const seed = Math.floor(t * 16) * 31 + i * 7;
+        r.dx = (rnd(seed) - 0.5) * A * 0.45;
+        r.dy = (rnd(seed + 3) - 0.5) * A * 0.45;
+        r.rot = (rnd(seed + 5) - 0.5) * 0.1;
+        break;
+      }
+      case "cair": {
+        const step = 0.5 / sp, dur = 1.1 / Math.sqrt(sp);
+        const cycle = n * step + dur + 2.5;
+        const ph = (t % cycle) - i * step;
+        if (ph < 0) { r.show = false; break; }
+        const p = Math.min(1, ph / dur);
+        r.dy = -(1 - easeOutBounce(p)) * L.H * 1.1;
+        break;
+      }
+      case "maquina": {
+        const step = 0.55 / sp;
+        const cycle = n * step + 2.5;
+        r.show = i < Math.floor((t % cycle) / step);
+        break;
+      }
+      case "piscar": {
+        const period = 2.2 / sp;
+        r.show = (t % period) < period * 0.65;
+        break;
+      }
+      case "alternado": r.alpha = (Math.floor(t * sp * 1.6) + i) % 2 ? 0.18 : 1; break;
+    }
+    return r;
+  }
+
+  function typedCount(st, n, t) {
+    const sp = 0.5 + st.speed * 0.3;
+    const step = 0.55 / sp;
+    const cycle = n * step + 2.5;
+    return Math.min(n, Math.floor((t % cycle) / step));
+  }
+
+  // ---------- paint (fill style) ----------
+  function makeFill(ctx, st, L, x0, t) {
+    const top = L.y0 + L.shift, bot = top + L.textH;
+    const lin = (stops) => {
+      const g = ctx.createLinearGradient(0, top, 0, bot);
+      stops.forEach(([o, c]) => g.addColorStop(o, c));
+      return g;
+    };
+    switch (st.paint) {
+      case "degrade": return () => lin([[0, st.fg], [1, st.fx]]);
+      case "metal": { const g = lin([[0, "#ffffff"], [0.42, "#c9d2de"], [0.5, "#4d5566"], [0.56, "#8d97a8"], [1, "#eef2f7"]]); return () => g; }
+      case "ouro": { const g = lin([[0, "#fff4c2"], [0.4, "#f2c14e"], [0.52, "#8a5a12"], [0.6, "#c98e22"], [1, "#ffe08a"]]); return () => g; }
+      case "fogo": { const g = lin([[0, "#d41400"], [0.45, "#ff7a00"], [0.8, "#ffd23f"], [1, "#fff7c9"]]); return () => g; }
+      case "arcoiris": return (u) => `hsl(${(u * 300) % 360} 95% 60%)`;
+      case "arcoiris-anim": return (u) => `hsl(${(u * 300 + t * 140) % 360} 95% 60%)`;
+      case "por-do-sol": { const g = lin([[0, "#ffd166"], [0.45, "#ff6b6b"], [1, "#7b2cbf"]]); return () => g; }
+      case "oceano": { const g = lin([[0, "#caf0f8"], [0.5, "#00b4d8"], [1, "#023e8a"]]); return () => g; }
+      case "brilho": {
+        const c = x0 + (((t * 0.35) % 1.5) - 0.25) * Math.max(L.textW, L.H);
+        const w = L.textH * 0.5;
+        const g = ctx.createLinearGradient(c - w, top, c + w, bot);
+        g.addColorStop(0, st.fg); g.addColorStop(0.5, "#ffffff"); g.addColorStop(1, st.fg);
+        return () => g;
+      }
+      case "listras":
+      case "bolinhas":
+      case "xadrez": {
+        const p = Math.max(8, Math.round(L.textH * 0.14));
+        const pat = ctx.createPattern(patternTile(st.paint, p, st.fg, st.fx), "repeat");
+        if (pat.setTransform) {
+          const move = st.paint === "listras" ? (t * p * 1.5) % (p * 2) : 0;
+          pat.setTransform(new DOMMatrix().translate(move, top));
+        }
+        return () => pat;
+      }
+      default: return () => st.fg;
+    }
+  }
+
+  // Small repeating tiles for the patterned paints, cached per colour and size.
+  const tileCache = new Map();
+  function patternTile(kind, p, fg, fx) {
+    const key = [kind, p, fg, fx].join("|");
+    if (tileCache.has(key)) return tileCache.get(key);
+    const pc = document.createElement("canvas");
+    pc.width = pc.height = p * 2;
+    const c2 = pc.getContext("2d");
+    c2.fillStyle = fg; c2.fillRect(0, 0, p * 2, p * 2);
+    c2.fillStyle = fx; c2.strokeStyle = fx;
+    if (kind === "listras") {
+      c2.lineWidth = p * 0.7;
+      c2.beginPath();
+      for (let k = -2; k <= 2; k++) { c2.moveTo(k * p * 2, p * 2); c2.lineTo(k * p * 2 + p * 2, 0); }
+      c2.moveTo(-p, p); c2.lineTo(p, -p); c2.moveTo(p * 3, p); c2.lineTo(p, p * 3);
+      c2.stroke();
+    } else if (kind === "bolinhas") {
+      c2.beginPath();
+      c2.arc(p / 2, p / 2, p * 0.32, 0, Math.PI * 2);
+      c2.moveTo(p * 1.5 + p * 0.32, p * 1.5);
+      c2.arc(p * 1.5, p * 1.5, p * 0.32, 0, Math.PI * 2);
+      c2.fill();
+    } else {
+      c2.fillRect(0, 0, p, p); c2.fillRect(p, p, p, p);
+    }
+    if (tileCache.size > 40) tileCache.clear();
+    tileCache.set(key, pc);
+    return pc;
+  }
+
+  function sparkle(ctx, x, y, r) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.quadraticCurveTo(x, y, x, y + r);
+    ctx.quadraticCurveTo(x, y, x - r, y);
+    ctx.quadraticCurveTo(x, y, x, y - r);
+    ctx.fill();
+  }
+
+  // ---------- drawing ----------
+  function drawGlyph(ctx, g, x, y, L, st, fill, t, i, gw) {
+    const h = L.textH, dpr = L.dpr;
+    switch (st.style) {
+      case "balao":
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = fill; ctx.lineWidth = L.sw * 2; ctx.strokeText(g, x, y);
+        ctx.fillStyle = fill; ctx.fillText(g, x, y);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.18)"; ctx.fillText(g, x + h * 0.02, y + h * 0.03);
+        ctx.fillStyle = fill; ctx.fillText(g, x, y);
+        gloss(ctx, g, x, y, L, 0.75);
+        return;
+      case "bala":
+        ctx.fillStyle = fill; ctx.fillText(g, x, y);
+        gloss(ctx, g, x, y, L, 0.8);
+        return;
+      case "costura":
+        ctx.fillStyle = fill; ctx.fillText(g, x, y);
+        ctx.setLineDash([h * 0.045, h * 0.03]);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)"; ctx.lineWidth = Math.max(1, h * 0.014);
+        ctx.strokeText(g, x, y);
+        ctx.setLineDash([]);
+        return;
+      case "vidro":
+        ctx.globalAlpha *= 0.25; ctx.fillStyle = fill; ctx.fillText(g, x, y); ctx.globalAlpha /= 0.25;
+        ctx.strokeStyle = fill; ctx.lineWidth = L.sw * 2; ctx.strokeText(g, x, y);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; ctx.lineWidth = L.sw * 0.5; ctx.strokeText(g, x, y);
+        gloss(ctx, g, x, y, L, 0.45);
+        return;
+      case "sombra-suave":
+        ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+        ctx.shadowBlur = h * 0.12 * dpr;
+        ctx.shadowOffsetX = ctx.shadowOffsetY = L.off * dpr;
+        ctx.fillStyle = fill; ctx.fillText(g, x, y);
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = ctx.shadowOffsetY = 0;
+        return;
+      case "sombra-dupla":
+        ctx.fillStyle = shade(st.fx, 0.6); ctx.fillText(g, x + L.off * 2, y + L.off * 2);
+        ctx.fillStyle = st.fx; ctx.fillText(g, x + L.off, y + L.off);
+        break;
+      case "sombra-chao":
+        ctx.save();
+        ctx.translate(0, y);
+        ctx.transform(1, 0, -1.2, -0.35, 0, 0);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.fillText(g, x, 0);
+        ctx.restore();
+        break;
+      case "contorno-arcoiris":
+        ctx.lineJoin = "round";
+        for (let k = 4; k >= 1; k--) {
+          ctx.strokeStyle = `hsl(${(k * 70 + t * 60) % 360} 95% 58%)`;
+          ctx.lineWidth = L.sw * 2 * k;
+          ctx.strokeText(g, x, y);
+        }
+        break;
+      case "contorno-triplo":
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = st.fx; ctx.lineWidth = L.sw * 6; ctx.strokeText(g, x, y);
+        ctx.strokeStyle = st.bg; ctx.lineWidth = L.sw * 4; ctx.strokeText(g, x, y);
+        ctx.strokeStyle = st.fx; ctx.lineWidth = L.sw * 2; ctx.strokeText(g, x, y);
+        break;
+      case "lampadas":
+        ctx.globalAlpha *= 0.3; ctx.fillStyle = fill; ctx.fillText(g, x, y); ctx.globalAlpha /= 0.3;
+        ctx.lineCap = "round";
+        ctx.setLineDash([0.001, L.sw * 1.9]);
+        ctx.lineDashOffset = -t * L.sw * 3;
+        ctx.shadowColor = st.fx; ctx.shadowBlur = L.sw * 1.5 * dpr;
+        ctx.strokeStyle = "#fff6c0"; ctx.lineWidth = L.sw; ctx.strokeText(g, x, y);
+        ctx.shadowBlur = 0; ctx.setLineDash([]); ctx.lineCap = "butt";
+        return;
+      case "formigas":
+        ctx.globalAlpha *= 0.2; ctx.fillStyle = fill; ctx.fillText(g, x, y); ctx.globalAlpha /= 0.2;
+        ctx.setLineDash([L.sw * 2.5, L.sw * 1.5]);
+        ctx.lineDashOffset = -t * L.sw * 8;
+        ctx.strokeStyle = fill; ctx.lineWidth = L.sw; ctx.strokeText(g, x, y);
+        ctx.setLineDash([]);
+        return;
+      case "3d-arcoiris": {
+        const steps = Math.max(8, Math.ceil(L.off / 1.5));
+        for (let k = steps; k >= 1; k--) {
+          const d = (L.off * k) / steps;
+          ctx.fillStyle = `hsl(${((k / steps) * 300 + t * 60) % 360} 90% 55%)`;
+          ctx.fillText(g, x + d, y + d);
+        }
+        break;
+      }
+      case "eco-arcoiris": {
+        const breathe = 0.7 + 0.3 * Math.sin(t * 3 + i * 0.4);
+        for (let k = 4; k >= 1; k--) {
+          ctx.globalAlpha *= 0.65;
+          ctx.fillStyle = `hsl(${(k * 60 + t * 80) % 360} 95% 60%)`;
+          ctx.fillText(g, x + L.off * k * breathe, y + L.off * k * breathe);
+          ctx.globalAlpha /= 0.65;
+        }
+        break;
+      }
+      case "aura":
+        ctx.shadowColor = `hsl(${(t * 60 + i * 20) % 360} 100% 60%)`;
+        ctx.shadowBlur = h * (0.2 + 0.1 * Math.sin(t * 3)) * dpr;
+        ctx.fillStyle = fill; ctx.fillText(g, x, y); ctx.fillText(g, x, y);
+        ctx.shadowBlur = 0;
+        return;
+      case "gelo": {
+        const top = y - L.asc;
+        const ice = ctx.createLinearGradient(0, top, 0, top + h);
+        ice.addColorStop(0, "#ffffff"); ice.addColorStop(0.5, "#bfe9ff"); ice.addColorStop(1, "#5cb8f0");
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = L.sw; ctx.strokeText(g, x, y);
+        ctx.fillStyle = ice; ctx.fillText(g, x, y);
+        if (g.trim()) {
+          ctx.fillStyle = "rgba(220, 244, 255, 0.9)";
+          for (let k = 0; k < 3; k++) {
+            if (rnd(i * 4.1 + k) < 0.35) continue;
+            const ix = x + gw * (0.15 + 0.7 * rnd(i * 2.3 + k * 1.7));
+            const len = L.below * (0.4 + 0.6 * rnd(i * 5.5 + k)) * (0.9 + 0.1 * Math.sin(t * 2 + k));
+            const w = h * 0.035;
+            ctx.beginPath(); ctx.moveTo(ix - w, y - h * 0.02); ctx.lineTo(ix + w, y - h * 0.02); ctx.lineTo(ix, y + len); ctx.closePath(); ctx.fill();
+          }
+          if (rnd(Math.floor(t * 2) + i * 3) < 0.15) {
+            ctx.fillStyle = "#ffffff";
+            sparkle(ctx, x + gw * rnd(i + Math.floor(t * 2)), top + h * 0.3, h * 0.06);
+          }
+        }
+        return;
+      }
+      case "chamas":
+        if (g.trim()) {
+          const top = y - L.asc;
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          for (let k = 0; k < 4; k++) {
+            const fx = x + gw * (0.15 + 0.7 * rnd(i * 3.1 + k * 2.2));
+            const fl = 0.55 + 0.45 * Math.abs(Math.sin(t * (5 + k) + i * 1.3 + k));
+            const fh = L.above * fl * (0.6 + 0.4 * rnd(i + k * 7));
+            const fw = h * 0.1;
+            const gr = ctx.createLinearGradient(0, top + h * 0.05, 0, top - fh);
+            gr.addColorStop(0, "rgba(255, 220, 80, 0.9)"); gr.addColorStop(0.5, "rgba(255, 110, 0, 0.7)"); gr.addColorStop(1, "rgba(200, 20, 0, 0)");
+            ctx.fillStyle = gr;
+            ctx.beginPath();
+            ctx.moveTo(fx - fw, top + h * 0.08);
+            ctx.quadraticCurveTo(fx - fw * 0.9, top - fh * 0.5, fx + Math.sin(t * 6 + k) * fw * 0.4, top - fh);
+            ctx.quadraticCurveTo(fx + fw * 0.9, top - fh * 0.5, fx + fw, top + h * 0.08);
+            ctx.closePath(); ctx.fill();
+          }
+          ctx.restore();
+        }
+        ctx.shadowColor = "#ff5a00";
+        ctx.shadowBlur = h * 0.15 * dpr;
+        break;
+      case "sombra-longa": {
+        ctx.fillStyle = st.fx;
+        const steps = Math.min(40, Math.max(10, Math.ceil(L.off / 1.2)));
+        for (let k = steps; k >= 1; k--) { const d = (L.off * k) / steps; ctx.fillText(g, x + d, y + d); }
+        break;
+      }
+      case "relevo":
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)"; ctx.fillText(g, x + L.off, y + L.off);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.7)"; ctx.fillText(g, x - L.off, y - L.off);
+        break;
+      case "neon-tubo": {
+        let glow = 0.85 + 0.15 * Math.sin(t * 3 + i);
+        if (rnd(Math.floor(t * 9) + i * 0.1) < 0.04) glow = 0.2;
+        ctx.shadowColor = st.fx;
+        ctx.shadowBlur = h * 0.2 * dpr * glow;
+        ctx.strokeStyle = st.fx; ctx.lineWidth = L.sw; ctx.strokeText(g, x, y);
+        ctx.shadowBlur = h * 0.05 * dpr * glow;
+        ctx.strokeStyle = fill; ctx.lineWidth = L.sw * 0.4; ctx.strokeText(g, x, y);
+        ctx.shadowBlur = 0;
+        return;
+      }
+      case "fantasma":
+        ctx.globalAlpha *= 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(t * 1.8 + i * 0.7));
+        ctx.shadowColor = st.fx;
+        ctx.shadowBlur = h * 0.25 * dpr;
+        break;
+      case "adesivo":
+        ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+        ctx.shadowOffsetY = L.off * dpr;
+        ctx.shadowBlur = h * 0.03 * dpr;
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = L.sw * 2; ctx.strokeText(g, x, y);
+        ctx.shadowColor = "transparent"; ctx.shadowOffsetY = 0; ctx.shadowBlur = 0;
+        break;
+      case "quadrinhos":
+        ctx.strokeStyle = "#000000"; ctx.lineWidth = L.sw * 2;
+        ctx.fillStyle = st.fx;
+        ctx.strokeText(g, x + L.off, y + L.off); ctx.fillText(g, x + L.off, y + L.off);
+        ctx.strokeText(g, x, y);
+        break;
+      case "rabisco": {
+        const seed = Math.floor(t * 7) * 13 + i * 5;
+        ctx.globalAlpha *= 0.25; ctx.fillStyle = fill; ctx.fillText(g, x, y);
+        ctx.globalAlpha /= 0.25;
+        ctx.strokeStyle = fill; ctx.lineWidth = L.sw;
+        for (let k = 0; k < 3; k++) {
+          const jx = (rnd(seed + k * 3) - 0.5) * h * 0.03, jy = (rnd(seed + k * 3 + 1) - 0.5) * h * 0.03;
+          ctx.strokeText(g, x + jx, y + jy);
+        }
+        return;
+      }
+      case "glitch": {
+        const j = rnd(Math.floor(t * 12) + i * 3.3);
+        const d = L.off * (j > 0.8 ? 2.5 : 1);
+        const jump = j > 0.93 ? (rnd(j * 99) - 0.5) * h * 0.3 : 0;
+        ctx.globalAlpha *= 0.85;
+        ctx.fillStyle = "#ff2050"; ctx.fillText(g, x - d + jump, y);
+        ctx.fillStyle = "#00e5ff"; ctx.fillText(g, x + d + jump, y);
+        ctx.globalAlpha /= 0.85;
+        x += jump * 0.5;
+        break;
+      }
+      case "rastro": {
+        const dir = st.mov === "rolar-dir" ? -1 : 1;
+        ctx.fillStyle = fill;
+        for (let k = 5; k >= 1; k--) {
+          ctx.globalAlpha *= 0.14 * (6 - k) / 5 + 0.02;
+          ctx.fillText(g, x + dir * k * h * 0.07, y);
+          ctx.globalAlpha /= 0.14 * (6 - k) / 5 + 0.02;
+        }
+        break;
+      }
+      case "reflexo": {
+        const bottom = L.y0 + L.shift + h;
+        ctx.save();
+        // Keep the reflection inside this line's own floor, so it never covers a line below.
+        ctx.beginPath();
+        ctx.rect(-1e5, bottom, 2e5, L.below + h * 0.04);
+        ctx.clip();
+        ctx.translate(0, bottom * 2 + h * 0.04);
+        ctx.scale(1, -1);
+        ctx.globalAlpha *= 0.28;
+        ctx.fillStyle = fill;
+        ctx.fillText(g, x, y);
+        ctx.restore();
+        break;
+      }
+      case "sombra":
+        ctx.fillStyle = st.fx; ctx.fillText(g, x + L.off, y + L.off); break;
+      case "3d": {
+        ctx.fillStyle = st.fx;
+        const steps = Math.max(6, Math.ceil(L.off / 1.5));
+        for (let k = steps; k >= 1; k--) { const d = (L.off * k) / steps; ctx.fillText(g, x + d, y + d); }
+        break;
+      }
+      case "contorno":
+        ctx.strokeStyle = st.fx; ctx.lineWidth = L.sw * 2; ctx.strokeText(g, x, y); break;
+      case "duplo":
+        ctx.strokeStyle = st.fx; ctx.lineWidth = L.sw * 4; ctx.strokeText(g, x, y);
+        ctx.strokeStyle = st.bg; ctx.lineWidth = L.sw * 2.2; ctx.strokeText(g, x, y);
+        break;
+      case "vazado":
+        ctx.strokeStyle = fill; ctx.lineWidth = L.sw; ctx.strokeText(g, x, y); return;
+      case "neon": {
+        let glow = 0.85 + 0.15 * Math.sin(t * 3);
+        if (rnd(Math.floor(t * 9)) < 0.05) glow = 0.25;
+        ctx.shadowColor = st.fx;
+        ctx.shadowBlur = L.textH * 0.22 * L.dpr * glow;
+        ctx.fillStyle = st.fx; ctx.fillText(g, x, y);
+        ctx.shadowBlur = L.textH * 0.08 * L.dpr * glow;
+        ctx.fillStyle = fill; ctx.fillText(g, x, y);
+        ctx.shadowBlur = 0;
+        return;
+      }
+    }
+    if (st.paint === "fogo") {
+      ctx.shadowColor = "#ff5a00";
+      ctx.shadowBlur = h * (0.12 + 0.08 * rnd(Math.floor(t * 12))) * dpr;
+    }
+    ctx.fillStyle = fill;
+    ctx.fillText(g, x, y);
+    ctx.shadowBlur = 0;
+
+    if (st.style === "derretendo" && g.trim()) {
+      const sp = 0.5 + st.speed * 0.3;
+      const bottom = L.y0 + L.shift + h;
+      for (let k = 0; k < 3; k++) {
+        const seed = i * 7.1 + k * 2.3;
+        if (rnd(seed) < 0.3) continue;
+        const dx = x + gw * (0.15 + 0.7 * rnd(seed + 1));
+        const p = (t * 0.18 * sp + rnd(seed + 2)) % 1;
+        const len = L.below * (0.35 + 0.6 * rnd(seed + 3)) * Math.sin(p * Math.PI * 0.5);
+        const w = h * (0.035 + 0.03 * rnd(seed + 4));
+        ctx.beginPath();
+        ctx.rect(dx - w / 2, bottom - h * 0.08, w, h * 0.08 + len);
+        ctx.moveTo(dx + w * 0.75, bottom + len);
+        ctx.arc(dx, bottom + len, w * 0.75, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (st.style === "brilhos" && g.trim()) {
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = h * 0.06 * dpr;
+      for (let k = 0; k < 2; k++) {
+        const ph = t * (2 + rnd(i + k * 5)) + rnd(i * 3 + k) * 6.28;
+        const cyc = Math.floor(ph / Math.PI);
+        const size = Math.max(0, Math.sin(ph)) * h * 0.09;
+        if (size < 0.5) continue;
+        const sx = x + gw * rnd(i * 11 + k * 7 + cyc * 3.7);
+        const sy = y - L.asc + h * rnd(i * 13 + k * 5 + cyc * 1.9);
+        sparkle(ctx, sx, sy, size);
+      }
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function drawText(ctx, L, st, x0, t) {
+    if (L.empty) return;
+    const n = L.glyphs.length;
+    const fillFor = makeFill(ctx, st, L, x0, t);
+    if (isMatrix(st.style)) return drawCells(ctx, L, st, x0, t, fillFor);
+
+    ctx.font = fontSpec(st.font, L.size);
+    setSpacing(ctx, 0);
+    ctx.textBaseline = "alphabetic";
+    ctx.lineJoin = "round";
+    const baseX = x0 + L.left + L.shift;
+    const baseY = L.y0 + L.asc + L.shift;
+    const cy = L.y0 + L.shift + L.textH / 2;
+    const margin = L.textH;
+
+    for (let i = 0; i < n; i++) {
+      const g = L.glyphs[i];
+      if (g === " ") continue;
+      const gx = baseX + L.xs[i];
+      const gw = L.xs[i + 1] - L.xs[i];
+      if (gx + gw + margin < 0 || gx - margin > L.W) continue;
+      const gi = i + L.gOff;
+      const tr = letterT(st, L, gi, L.nTotal, t);
+      if (!tr.show) continue;
+      const cx = gx + (gw - L.spacingPx) / 2;
+      ctx.save();
+      ctx.globalAlpha = tr.alpha;
+      ctx.translate(cx + tr.dx, cy + tr.dy);
+      if (tr.rot) ctx.rotate(tr.rot);
+      if (tr.sx !== 1 || tr.sy !== 1) ctx.scale(tr.sx, tr.sy);
+      ctx.translate(-cx, -cy);
+      if (mixFonts(st)) ctx.font = fontSpec(glyphFont(st, gi), L.size);
+      const fill = mixColors(st) ? glyphColor(gi) : fillFor(n > 1 ? i / (n - 1) : 0);
+      drawGlyph(ctx, g, gx, baseY, L, st, fill, t, gi, gw - L.spacingPx);
+      ctx.restore();
+    }
+
+    if (st.letters === "maquina") {
+      // The cursor sits on whichever line is being typed.
+      const typed = typedCount(st, L.nTotal, t);
+      const k = typed - L.gOff;
+      const onThisLine = L.gOff === 0 ? typed <= n : k > 0;
+      if (onThisLine && k >= 0 && k <= n && (t * 2.2) % 1 < 0.6) {
+        const cxr = baseX + L.xs[k] + L.textH * 0.04;
+        ctx.fillStyle = st.fg;
+        ctx.fillRect(cxr, L.y0 + L.shift + L.textH * 0.1, L.textH * 0.09, L.textH * 0.85);
+      }
+    }
+  }
+
+  function drawCells(ctx, L, st, x0, t, fillFor) {
+    const c = L.cell, m = L.mask, led = st.style === "led";
+    const X0 = led ? Math.round(x0 / c) * c : x0;
+    if (led) { ctx.shadowColor = st.fg; ctx.shadowBlur = c * 0.9 * L.dpr; }
+    for (let gi = 0; gi < m.n; gi++) {
+      const cells = m.byGlyph[gi];
+      if (!cells.length) continue;
+      const gxC = X0 + m.centers[gi] * c;
+      if (gxC + L.textH < 0 || gxC - L.textH > L.W) continue;
+      const tr = letterT(st, L, gi + L.gOff, L.nTotal, t);
+      if (!tr.show) continue;
+      ctx.globalAlpha = tr.alpha;
+      ctx.beginPath();
+      for (let k = 0; k < cells.length; k += 2) {
+        let px = X0 + cells[k] * c;
+        let py = L.y0 + cells[k + 1] * c + tr.dy;
+        px = gxC + (px + c / 2 - gxC) * tr.sx - c / 2 + tr.dx;
+        if (led) {
+          px = Math.round(px / c) * c;
+          py = L.y0 + Math.round((py - L.y0) / c) * c;
+        }
+        if (st.style === "blocos") ctx.rect(px + c * 0.05, py + c * 0.05, c * 0.9, c * 0.9);
+        else {
+          const rr = c * (led ? 0.38 : 0.42) * Math.min(1, Math.abs(tr.sy));
+          ctx.moveTo(px + c / 2 + rr, py + c / 2);
+          ctx.arc(px + c / 2, py + c / 2, rr, 0, Math.PI * 2);
+        }
+      }
+      ctx.fillStyle = mixColors(st) ? glyphColor(gi + L.gOff) : fillFor(m.n > 1 ? gi / (m.n - 1) : 0);
+      if (led && mixColors(st)) ctx.shadowColor = ctx.fillStyle;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+  }
+
+  function drawLedGrid(ctx, L, st) {
+    const c = L.cell;
+    const oy = ((L.y0 % c) + c) % c;
+    ctx.globalAlpha = 0.13;
+    ctx.fillStyle = st.fg;
+    ctx.beginPath();
+    for (let y = oy - c; y < L.H; y += c)
+      for (let x = 0; x < L.W; x += c) {
+        ctx.moveTo(x + c / 2 + c * 0.38, y + c / 2);
+        ctx.arc(x + c / 2, y + c / 2, c * 0.38, 0, Math.PI * 2);
+      }
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- scene ----------
+  const STARS = Array.from({ length: 160 }, (_, i) => ({ x: rnd(i * 3 + 1), y: rnd(i * 3 + 2), r: 0.4 + rnd(i * 3 + 3) * 1.4, p: rnd(i * 7) * 6.28 }));
+  const CONFETTI_COLORS = ["#ff4d6d", "#ffd23f", "#3ec1d3", "#7bd389", "#b983ff", "#ff8c42", "#ffffff"];
+  const CONFETTI = Array.from({ length: 110 }, (_, i) => ({
+    x: rnd(i * 5 + 1), y: rnd(i * 5 + 2), v: 0.08 + rnd(i * 5 + 3) * 0.18,
+    rot: rnd(i * 5 + 4) * 6.28, vr: (rnd(i * 5 + 5) - 0.5) * 6, w: 0.5 + rnd(i * 11) * 0.8,
+    sway: rnd(i * 13) * 6.28, color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  }));
+
+  function shade(hex, f) {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.max(0, Math.min(255, Math.round(v * f)));
+    return `rgb(${ch(n >> 16)}, ${ch((n >> 8) & 255)}, ${ch(n & 255)})`;
+  }
+
+  function drawScene(ctx, L, st, t) {
+    const { W, H } = L;
+    if (st.scene === "arcoiris") ctx.fillStyle = `hsl(${(t * 25) % 360} 65% 22%)`;
+    else if (st.scene === "degrade" || st.scene === "grade") {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, st.scene === "grade" ? "#000000" : shade(st.bg, 1.8));
+      g.addColorStop(1, st.scene === "grade" ? st.bg : shade(st.bg, 0.35));
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = st.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    const u = Math.max(W, H) / 900;
+    if (st.scene === "estrelas") {
+      ctx.fillStyle = "#ffffff";
+      for (const s of STARS) {
+        ctx.globalAlpha = 0.25 + 0.75 * Math.abs(Math.sin(t * 1.3 + s.p));
+        ctx.beginPath();
+        ctx.arc(((s.x * W - t * 6 * s.r) % W + W) % W, s.y * H, s.r * u, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    } else if (st.scene === "confete") {
+      for (const p of CONFETTI) {
+        const y = ((p.y + t * p.v) % 1.1) * (H + 40) - 20;
+        const x = p.x * W + Math.sin(t * 1.5 + p.sway) * 14 * u;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(p.rot + t * p.vr);
+        ctx.scale(1, Math.cos(t * 3 + p.sway));
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-5 * p.w * u, -3 * u, 10 * p.w * u, 6 * u);
+        ctx.restore();
+      }
+    } else if (st.scene === "grade") {
+      const hz = H * 0.55;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, hz, W, H - hz); ctx.clip();
+      ctx.strokeStyle = st.fx; ctx.lineWidth = Math.max(1, u * 1.2);
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      for (let k = -14; k <= 14; k++) {
+        ctx.moveTo(W / 2 + k * W * 0.02, hz);
+        ctx.lineTo(W / 2 + k * W * 0.2, H);
+      }
+      const ph = (t * 0.35) % 1;
+      for (let k = 0; k < 10; k++) {
+        const z = (k + ph) / 10;
+        const y = hz + (H - hz) * z * z;
+        ctx.moveTo(0, y); ctx.lineTo(W, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+      const sun = ctx.createLinearGradient(0, hz - H * 0.45, 0, hz);
+      sun.addColorStop(0, "#ffd23f"); sun.addColorStop(1, st.fx);
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = sun;
+      ctx.beginPath(); ctx.arc(W / 2, hz, H * 0.4, Math.PI, 0); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    drawPartyScene(ctx, L, st, t, u);
+  }
+
+  // ---------- party backgrounds ----------
+  const PARTY = ["#ff4d6d", "#ffd23f", "#3ec1d3", "#7bd389", "#b983ff", "#ff8c42", "#ff7eb6"];
+  const pc = (i) => PARTY[((i % PARTY.length) + PARTY.length) % PARTY.length];
+  const seq = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  const BALLOONS = seq(16, (i) => ({ x: rnd(i * 3.1 + 7), v: 0.5 + rnd(i * 5.3) * 0.6, s: 0.7 + rnd(i * 2.2) * 0.6, o: rnd(i * 9.7), sw: rnd(i * 4.4) * 6.28, c: pc(i) }));
+  const FLOATERS = seq(34, (i) => ({ x: rnd(i * 1.7 + 3), v: 0.25 + rnd(i * 6.1) * 0.5, s: 0.4 + rnd(i * 8.3) * 1.2, o: rnd(i * 2.9), sw: rnd(i * 7.7) * 6.28 }));
+  const SNOW = seq(170, (i) => ({ x: rnd(i * 2.3 + 1), v: 0.05 + rnd(i * 3.9) * 0.12, r: 0.6 + rnd(i * 5.1) * 2.4, o: rnd(i * 6.7), sw: rnd(i * 1.3) * 6.28 }));
+  const STREAMERS = seq(16, (i) => ({ x: rnd(i * 4.9 + 2), v: 0.07 + rnd(i * 2.7) * 0.1, o: rnd(i * 3.3), c: pc(i + 2), ph: rnd(i * 8.8) * 6.28 }));
+  const GLITTER_COLORS = ["#ffd700", "#ffffff", "#ff7eb6", "#c0c0c0", "#8be9fd"];
+  const GLITTER = seq(150, (i) => ({ x: rnd(i * 1.9 + 5), y: rnd(i * 2.6 + 4), p: rnd(i * 3.7) * 6.28, f: 1.5 + rnd(i * 4.2) * 3, c: GLITTER_COLORS[i % 5] }));
+  const HEART_COLORS = ["#ff4d6d", "#ff7eb6", "#ff99c8", "#e0115f"];
+
+  // Distance travelled along a looping path of length span (o = start offset 0..1, v = laps per second).
+  const drift = (o, v, t, span) => ((o + t * v) % 1) * span;
+
+  function heartPath(ctx, x, y, s) {
+    ctx.moveTo(x, y + s * 0.3);
+    ctx.bezierCurveTo(x, y, x - s * 0.5, y, x - s * 0.5, y + s * 0.3);
+    ctx.bezierCurveTo(x - s * 0.5, y + s * 0.6, x, y + s * 0.78, x, y + s);
+    ctx.bezierCurveTo(x, y + s * 0.78, x + s * 0.5, y + s * 0.6, x + s * 0.5, y + s * 0.3);
+    ctx.bezierCurveTo(x + s * 0.5, y, x, y, x, y + s * 0.3);
+    ctx.closePath();
+  }
+
+  function balloon(ctx, x, y, r, color, t, sw) {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(x, y + r * 1.15);
+    ctx.quadraticCurveTo(x + Math.sin(t * 2 + sw) * r * 0.5, y + r * 2, x, y + r * 2.9);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.ellipse(x, y, r * 0.85, r, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x, y + r * 0.96); ctx.lineTo(x - r * 0.13, y + r * 1.18); ctx.lineTo(x + r * 0.13, y + r * 1.18); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.38)";
+    ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.38, r * 0.16, r * 0.3, -0.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawPartyScene(ctx, L, st, t, u) {
+    const { W, H } = L;
+    if (drawMoreScenes(ctx, W, H, st, t, u) || drawKidsScenes(ctx, W, H, st, t, u) || drawStageScenes(ctx, W, H, st, t, u)) return;
+    switch (st.scene) {
+      case "baloes":
+        for (const b of BALLOONS) {
+          const r = H * 0.075 * b.s;
+          const y = H + r * 1.2 - drift(b.o, b.v * 0.12, t, H + r * 5);
+          const x = b.x * W + Math.sin(t * 0.9 + b.sw) * r * 0.5;
+          ctx.globalAlpha = 0.9;
+          balloon(ctx, x, y, r, b.c, t, b.sw);
+        }
+        ctx.globalAlpha = 1;
+        break;
+
+      case "fogos": {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (let s = 0; s < 5; s++) {
+          const P = 2.4 + rnd(s * 3.3) * 1.6;
+          const tt = t + rnd(s * 7.1) * P;
+          const k = Math.floor(tt / P), p = (tt % P) / P;
+          const seed = s * 100 + k * 7.3;
+          const cx = W * (0.1 + 0.8 * rnd(seed)), cy = H * (0.15 + 0.4 * rnd(seed + 1));
+          if (p < 0.22) {
+            const q = p / 0.22;
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = "#fff3c4";
+            ctx.beginPath(); ctx.arc(cx, H + (cy - H) * q * (2 - q), 2.2 * u, 0, Math.PI * 2); ctx.fill();
+            continue;
+          }
+          const q = (p - 0.22) / 0.78;
+          const e = 1 - Math.pow(1 - q, 3);
+          const R = Math.min(W, H * 1.6) * 0.22 * (0.7 + 0.5 * rnd(seed + 3));
+          const rot = rnd(seed + 4);
+          for (const [ring, col] of [[1, pc(Math.floor(rnd(seed + 2) * 7))], [0.6, pc(Math.floor(rnd(seed + 5) * 7))]]) {
+            ctx.globalAlpha = Math.max(0, 1 - q) * (ring === 1 ? 0.95 : 0.7);
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            const N = ring === 1 ? 36 : 22;
+            for (let j = 0; j < N; j++) {
+              const a = (j / N) * Math.PI * 2 + rot;
+              const px = cx + Math.cos(a) * R * e * ring;
+              const py = cy + Math.sin(a) * R * e * ring + q * q * H * 0.12;
+              const rr = 2.3 * u * (1 - q * 0.5);
+              ctx.moveTo(px + rr, py); ctx.arc(px, py, rr, 0, Math.PI * 2);
+            }
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+        break;
+      }
+
+      case "serpentinas":
+        ctx.lineWidth = 3.5 * u;
+        ctx.lineCap = "round";
+        for (const s of STREAMERS) {
+          const len = H * 0.32;
+          const y = drift(s.o, s.v, t, H + len * 2) - len;
+          ctx.strokeStyle = s.c;
+          ctx.beginPath();
+          for (let k = 0; k <= 24; k++) {
+            const yy = y + (k / 24) * len;
+            const xx = s.x * W + Math.sin(k * 0.55 + t * 3 + s.ph) * 9 * u;
+            k ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy);
+          }
+          ctx.stroke();
+        }
+        break;
+
+      case "purpurina":
+        for (const g of GLITTER) {
+          const a = Math.pow(Math.abs(Math.sin(t * g.f + g.p)), 3);
+          if (a < 0.05) continue;
+          const x = g.x * W, y = ((g.y + t * 0.015) % 1) * H;
+          ctx.globalAlpha = a;
+          ctx.fillStyle = g.c;
+          if (a > 0.9) sparkle(ctx, x, y, 6 * u);
+          else ctx.fillRect(x - 1.3 * u, y - 1.3 * u, 2.6 * u, 2.6 * u);
+        }
+        ctx.globalAlpha = 1;
+        break;
+
+      case "discoteca": {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        const rows = 7, per = 14;
+        for (let r = 0; r < rows; r++)
+          for (let k = 0; k < per; k++) {
+            const dir = r % 2 ? 1 : -1;
+            const fx = ((((k / per) + t * 0.035 * dir * (1 + r * 0.12)) % 1) + 1) % 1;
+            const x = fx * W, y = ((r + 0.5) / rows) * H + Math.sin(k * 1.3 + r) * H * 0.03;
+            ctx.globalAlpha = 0.2 + 0.4 * Math.abs(Math.sin(t * 2 + k + r * 1.7));
+            ctx.fillStyle = pc(r * 3 + k);
+            ctx.beginPath(); ctx.arc(x, y, H * 0.028, 0, Math.PI * 2); ctx.fill();
+          }
+        ctx.restore();
+        break;
+      }
+
+      case "holofotes": {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < 4; i++) {
+          const bx = W * (0.14 + 0.24 * i), by = H * 1.02;
+          const ang = -Math.PI / 2 + Math.sin(t * 0.7 * (1 + i * 0.2) + i * 1.7) * 0.6;
+          const len = Math.hypot(W, H) * 1.1, spread = 0.12;
+          const g = ctx.createRadialGradient(bx, by, 0, bx, by, len);
+          const col = pc(i * 2 + 1);
+          g.addColorStop(0, col + "88");
+          g.addColorStop(1, col + "00");
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(bx + Math.cos(ang - spread) * len, by + Math.sin(ang - spread) * len);
+          ctx.lineTo(bx + Math.cos(ang + spread) * len, by + Math.sin(ang + spread) * len);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+        break;
+      }
+
+      case "bolhas":
+        for (const b of FLOATERS) {
+          const r = H * 0.035 * b.s;
+          const y = H + r - drift(b.o, b.v * 0.1, t, H + r * 2);
+          const x = b.x * W + Math.sin(t * 1.1 + b.sw) * 14 * u;
+          ctx.fillStyle = "rgba(170, 220, 255, 0.10)";
+          ctx.strokeStyle = "rgba(200, 235, 255, 0.65)";
+          ctx.lineWidth = Math.max(1, 1.4 * u);
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.beginPath(); ctx.arc(x, y, r * 0.7, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke();
+        }
+        break;
+
+      case "coracoes":
+        FLOATERS.forEach((b, i) => {
+          const s = H * 0.07 * b.s;
+          const y = H + s - drift(b.o, b.v * 0.1, t, H + s * 2);
+          const x = b.x * W + Math.sin(t * 1.2 + b.sw) * 18 * u;
+          ctx.save();
+          ctx.globalAlpha = 0.75;
+          ctx.translate(x, y);
+          ctx.rotate(Math.sin(t * 1.5 + b.sw) * 0.3);
+          ctx.fillStyle = HEART_COLORS[i % 4];
+          ctx.beginPath(); heartPath(ctx, 0, -s / 2, s); ctx.fill();
+          ctx.restore();
+        });
+        break;
+
+      case "neve":
+        ctx.fillStyle = "#ffffff";
+        for (const f of SNOW) {
+          const y = drift(f.o, f.v * (0.6 + f.r * 0.25), t, H + 10) - 5;
+          const x = f.x * W + Math.sin(t * 0.8 + f.sw) * 16 * u;
+          ctx.globalAlpha = 0.5 + f.r * 0.15;
+          ctx.beginPath(); ctx.arc(x, y, f.r * u, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        break;
+    }
+  }
+
+  function starPath(ctx, cx, cy, r) {
+    ctx.moveTo(cx, cy - r);
+    for (let i = 1; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+
+  function borderPoints(W, H, e, gap) {
+    const pts = [];
+    const nx = Math.max(1, Math.round((W - 2 * e) / gap));
+    const ny = Math.max(1, Math.round((H - 2 * e) / gap));
+    for (let i = 0; i <= nx; i++) pts.push([e + (i * (W - 2 * e)) / nx, e]);
+    for (let j = 1; j <= ny; j++) pts.push([W - e, e + (j * (H - 2 * e)) / ny]);
+    for (let i = nx - 1; i >= 0; i--) pts.push([e + (i * (W - 2 * e)) / nx, H - e]);
+    for (let j = ny - 1; j >= 1; j--) pts.push([e, e + (j * (H - 2 * e)) / ny]);
+    return pts;
+  }
+
+  function drawBorder(ctx, L, st, t) {
+    const { W, H, B } = L;
+    ctx.strokeStyle = st.fg;
+    ctx.fillStyle = st.fg;
+    if (st.border === "simples") {
+      ctx.lineWidth = B;
+      ctx.strokeRect(B / 2, B / 2, W - B, H - B);
+    } else if (st.border === "dupla") {
+      ctx.lineWidth = B * 0.3;
+      ctx.strokeRect(B * 0.15, B * 0.15, W - B * 0.3, H - B * 0.3);
+      ctx.lineWidth = B * 0.12;
+      ctx.strokeRect(B * 0.8, B * 0.8, W - B * 1.6, H - B * 1.6);
+    } else if (st.border === "estrelas") {
+      ctx.beginPath();
+      for (const [x, y] of borderPoints(W, H, B / 2, B * 1.1)) starPath(ctx, x, y, B * 0.38);
+      ctx.fill();
+    } else if (st.border === "luzes") {
+      const pts = borderPoints(W, H, B / 2, B * 0.9);
+      const colors = ["#ff3b3b", "#ffd23f", "#3ec1d3", "#7bd389"];
+      const step = Math.floor(t * (1 + st.speed * 0.6));
+      pts.forEach(([x, y], i) => {
+        const on = (i + step) % 3 === 0;
+        ctx.fillStyle = colors[i % 4];
+        ctx.globalAlpha = on ? 1 : 0.25;
+        if (on) { ctx.shadowColor = colors[i % 4]; ctx.shadowBlur = B * 0.8 * L.dpr; }
+        ctx.beginPath(); ctx.arc(x, y, B * 0.26, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+      ctx.globalAlpha = 1;
+    } else {
+      drawPartyBorder(ctx, L, st, t);
+    }
+  }
+
+  // ---------- more animated backgrounds ----------
+  const CANDY_COLORS = ["#ff4d6d", "#ffd23f", "#3ec1d3", "#7bd389", "#b983ff", "#ff8c42"];
+  const FALLERS = seq(40, (i) => ({ x: rnd(i * 2.9 + 11), v: 0.06 + rnd(i * 4.1) * 0.1, s: 0.6 + rnd(i * 6.3) * 0.8, o: rnd(i * 1.7 + 5), sw: rnd(i * 3.3) * 6.28, r: rnd(i * 9.1) * 6.28 }));
+  const FLIES = seq(50, (i) => ({ x: rnd(i * 5.5 + 2), y: rnd(i * 7.7 + 3), a: rnd(i * 2.1) * 6.28, b: rnd(i * 8.4) * 6.28, f: 0.6 + rnd(i * 3.9) * 1.5 }));
+  const WARP = seq(220, (i) => ({ a: rnd(i * 1.3 + 9) * Math.PI * 2, d: 0.05 + rnd(i * 2.7) * 0.95, z: rnd(i * 4.9) }));
+  const CLOUDS = seq(7, (i) => ({ y: 0.08 + rnd(i * 3.7) * 0.55, v: 0.01 + rnd(i * 5.1) * 0.02, s: 0.7 + rnd(i * 6.9) * 0.8, o: rnd(i * 2.2) }));
+  const MATRIX_CHARS = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF";
+
+  function drawMoreScenes(ctx, W, H, st, t, u) {
+    switch (st.scene) {
+      case "doces":
+        FALLERS.forEach((c, i) => {
+          const s = H * 0.045 * c.s;
+          const y = drift(c.o, c.v, t, H + s * 4) - s * 2;
+          const x = c.x * W + Math.sin(t + c.sw) * 12 * u;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(c.r + t * (i % 2 ? 1 : -1));
+          ctx.fillStyle = CANDY_COLORS[i % CANDY_COLORS.length];
+          ctx.beginPath();
+          ctx.moveTo(-s * 0.7, 0); ctx.lineTo(-s * 1.3, -s * 0.45); ctx.lineTo(-s * 1.3, s * 0.45); ctx.closePath();
+          ctx.moveTo(s * 0.7, 0); ctx.lineTo(s * 1.3, -s * 0.45); ctx.lineTo(s * 1.3, s * 0.45); ctx.closePath();
+          ctx.moveTo(s * 0.75, 0); ctx.arc(0, 0, s * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+          ctx.fillRect(-s * 0.15, -s * 0.72, s * 0.3, s * 1.44);
+          ctx.restore();
+        });
+        return true;
+
+      case "petalas":
+        FALLERS.forEach((p, i) => {
+          const s = H * 0.03 * p.s;
+          const y = drift(p.o, p.v * 0.8, t, H + s * 4) - s * 2;
+          const x = p.x * W + Math.sin(t * 0.9 + p.sw) * 30 * u;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(p.r + t * 0.8);
+          ctx.scale(1, Math.cos(t * 2 + p.sw));
+          ctx.fillStyle = i % 3 ? "#ffb3c7" : "#ffe0ea";
+          ctx.globalAlpha = 0.85;
+          ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        });
+        return true;
+
+      case "notas":
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        FALLERS.slice(0, 22).forEach((n, i) => {
+          const s = H * 0.09 * n.s;
+          const y = H + s - drift(n.o, n.v, t, H + s * 2);
+          const x = n.x * W + Math.sin(t * 1.3 + n.sw) * 20 * u;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.sin(t * 2 + n.sw) * 0.3);
+          ctx.globalAlpha = 0.8;
+          ctx.fillStyle = pc(i);
+          ctx.font = `${s}px "Segoe UI Symbol", "Noto Music", "DejaVu Sans", sans-serif`;
+          ctx.fillText(["♪", "♫", "♬", "♩"][i % 4], 0, 0);
+          ctx.restore();
+        });
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
+        return true;
+
+      case "fogueira": {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < 90; i++) {
+          const life = (t * (0.5 + rnd(i * 2.3) * 0.5) + rnd(i * 5.1)) % 1;
+          const x0 = W * (0.3 + 0.4 * rnd(i * 1.7));
+          const x = x0 + Math.sin(t * 3 + i) * 10 * u * life + (W / 2 - x0) * life * 0.5;
+          const y = H - life * H * 0.55;
+          const r = H * 0.09 * (1 - life) * (0.6 + rnd(i * 3.3) * 0.6);
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+          const hue = 50 - life * 45;
+          g.addColorStop(0, `hsla(${hue}, 100%, 60%, ${0.55 * (1 - life)})`);
+          g.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = "#ffd23f";
+        for (let i = 0; i < 25; i++) {
+          const life = (t * 0.35 + rnd(i * 7.7)) % 1;
+          ctx.globalAlpha = 1 - life;
+          ctx.fillRect(W * (0.35 + 0.3 * rnd(i * 4.4)) + Math.sin(t * 2 + i) * 30 * u * life, H - life * H * 0.9, 2 * u, 2 * u);
+        }
+        ctx.restore();
+        return true;
+      }
+
+      case "nuvens": {
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, "#2f80d1"); sky.addColorStop(1, "#bfe6ff");
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(255, 236, 140, 0.9)";
+        ctx.beginPath(); ctx.arc(W * 0.85, H * 0.18, H * 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+        for (const c of CLOUDS) {
+          const s = H * 0.12 * c.s;
+          const x = drift(c.o, c.v, t, W + s * 6) - s * 3;
+          const y = c.y * H;
+          ctx.beginPath();
+          for (const [dx, dy, r] of [[0, 0, 1], [0.9, -0.3, 1.2], [1.9, 0, 0.95], [0.9, 0.3, 0.9]]) {
+            ctx.moveTo(x + dx * s + r * s, y + dy * s);
+            ctx.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2);
+          }
+          ctx.fill();
+        }
+        return true;
+      }
+
+      case "cadentes": {
+        ctx.fillStyle = "#ffffff";
+        for (const s of STARS) {
+          ctx.globalAlpha = 0.2 + 0.5 * Math.abs(Math.sin(t * 0.8 + s.p));
+          ctx.fillRect(s.x * W, s.y * H, s.r * u, s.r * u);
+        }
+        ctx.globalAlpha = 1;
+        for (let i = 0; i < 5; i++) {
+          const P = 2 + rnd(i * 3.1) * 2.5;
+          const tt = t + rnd(i * 6.6) * P;
+          const k = Math.floor(tt / P), p = (tt % P) / P;
+          if (p > 0.45) continue;
+          const q = p / 0.45;
+          const sx = W * (0.2 + 0.8 * rnd(i * 10 + k)), sy = H * 0.4 * rnd(i * 20 + k);
+          const len = W * 0.18;
+          const hx = sx - q * W * 0.5, hy = sy + q * W * 0.25;
+          const g = ctx.createLinearGradient(hx, hy, hx + len, hy - len * 0.5);
+          g.addColorStop(0, `rgba(255, 255, 255, ${1 - q})`);
+          g.addColorStop(1, "rgba(255, 255, 255, 0)");
+          ctx.strokeStyle = g;
+          ctx.lineWidth = 2.2 * u;
+          ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + len, hy - len * 0.5); ctx.stroke();
+        }
+        return true;
+      }
+
+      case "vagalumes":
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (const f of FLIES) {
+          const x = (f.x + Math.sin(t * 0.3 * f.f + f.a) * 0.06) * W;
+          const y = (f.y + Math.cos(t * 0.25 * f.f + f.b) * 0.08) * H;
+          const a = Math.pow(Math.max(0, Math.sin(t * f.f + f.a)), 2);
+          const r = H * 0.03;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+          g.addColorStop(0, `rgba(230, 255, 120, ${a})`);
+          g.addColorStop(1, "rgba(160, 255, 80, 0)");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+        return true;
+
+      case "aurora": {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        [["#3ef0a0", 0.25], ["#3ec1d3", 0.38], ["#b983ff", 0.5]].forEach(([col, base], i) => {
+          const g = ctx.createLinearGradient(0, H * (base - 0.2), 0, H * (base + 0.35));
+          g.addColorStop(0, col + "00"); g.addColorStop(0.3, col + "66"); g.addColorStop(1, col + "00");
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.moveTo(0, H);
+          for (let x = 0; x <= W; x += 12) {
+            const y = H * base + Math.sin(x / W * 5 + t * 0.6 + i * 2) * H * 0.08 + Math.sin(x / W * 11 - t * 0.4 + i) * H * 0.04;
+            ctx.lineTo(x, y);
+          }
+          ctx.lineTo(W, H);
+          ctx.closePath();
+          ctx.fill();
+        });
+        ctx.restore();
+        return true;
+      }
+
+      case "ondas": {
+        const layers = ["#0a4d8c", "#1270b8", "#1f93d6", "#5cc3ef"];
+        layers.forEach((col, i) => {
+          const base = H * (0.55 + i * 0.1);
+          ctx.fillStyle = col;
+          ctx.globalAlpha = 0.85;
+          ctx.beginPath();
+          ctx.moveTo(0, H);
+          for (let x = 0; x <= W; x += 8)
+            ctx.lineTo(x, base + Math.sin(x / W * (6 + i * 2) + t * (1 + i * 0.4) * (i % 2 ? -1 : 1)) * H * 0.035);
+          ctx.lineTo(W, H);
+          ctx.closePath();
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        return true;
+      }
+
+      case "raios": {
+        const n = 18, R = Math.hypot(W, H);
+        ctx.save();
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(t * 0.25);
+        ctx.fillStyle = st.fx;
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        for (let i = 0; i < n; i += 2) {
+          const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2;
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a0) * R, Math.sin(a0) * R);
+          ctx.lineTo(Math.cos(a1) * R, Math.sin(a1) * R);
+          ctx.closePath();
+        }
+        ctx.fill();
+        ctx.restore();
+        return true;
+      }
+
+      case "espiral": {
+        const R = Math.hypot(W, H) * 0.6;
+        ctx.save();
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(-t * 0.8);
+        ctx.lineWidth = H * 0.05;
+        ctx.globalAlpha = 0.35;
+        for (let arm = 0; arm < 6; arm++) {
+          ctx.strokeStyle = pc(arm);
+          ctx.beginPath();
+          for (let r = 0; r < R; r += 6) {
+            const a = (arm / 6) * Math.PI * 2 + r * 0.012;
+            r ? ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.moveTo(0, 0);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+        return true;
+      }
+
+      case "bokeh":
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        FALLERS.forEach((b, i) => {
+          const r = H * (0.04 + 0.08 * rnd(i * 5.9));
+          const x = ((b.x + t * 0.01 * (i % 2 ? 1 : -1)) % 1 + 1) % 1 * W;
+          const y = H + r - drift(b.o, b.v * 0.25, t, H + r * 2);
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+          const col = pc(i);
+          g.addColorStop(0, col + "55"); g.addColorStop(0.7, col + "33"); g.addColorStop(1, col + "00");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.restore();
+        return true;
+
+      case "dobra": {
+        const cx = W / 2, cy = H / 2, M = Math.hypot(W, H) * 0.6;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineCap = "round";
+        for (const s of WARP) {
+          const z = 1 - ((s.z + t * 0.35) % 1);
+          const k1 = s.d / Math.max(0.02, z), k0 = s.d / Math.max(0.02, z + 0.06);
+          const r1 = k1 * M * 0.15, r0 = k0 * M * 0.15;
+          if (r0 > M) continue;
+          ctx.globalAlpha = Math.min(1, (1 - z) * 1.5);
+          ctx.lineWidth = Math.max(0.8, (1 - z) * 2.6 * u);
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(s.a) * r0, cy + Math.sin(s.a) * r0);
+          ctx.lineTo(cx + Math.cos(s.a) * r1, cy + Math.sin(s.a) * r1);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        return true;
+      }
+
+      case "matrix": {
+        const fs = Math.max(10, 15 * u);
+        const cols = Math.ceil(W / fs);
+        ctx.font = `${fs}px Consolas, "Courier New", monospace`;
+        ctx.textBaseline = "top";
+        for (let c = 0; c < cols; c++) {
+          const speed = 0.25 + rnd(c * 3.3) * 0.5;
+          const head = ((t * speed + rnd(c * 7.1)) % 1.4) * (H + fs * 14);
+          for (let k = 0; k < 14; k++) {
+            const y = head - k * fs;
+            if (y < -fs || y > H) continue;
+            const ch = MATRIX_CHARS[Math.floor(rnd(c * 13 + Math.floor((head - k * fs) / fs) + Math.floor(t * 4) * (k === 0 ? 1 : 0)) * MATRIX_CHARS.length)];
+            ctx.globalAlpha = k === 0 ? 1 : 0.8 * (1 - k / 14);
+            ctx.fillStyle = k === 0 ? "#d8ffd8" : "#2bff6a";
+            ctx.fillText(ch, c * fs, y);
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.textBaseline = "alphabetic";
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- kids, weather and hypnotic backgrounds ----------
+  const tri = (x) => 1 - Math.abs((((x % 2) + 2) % 2) - 1); // 0→1→0 triangle wave, period 2
+  const RAIN = seq(200, (i) => ({ x: rnd(i * 1.1 + 4), v: 0.8 + rnd(i * 2.3) * 0.6, o: rnd(i * 3.7), l: 0.5 + rnd(i * 5.9) }));
+
+  function drawKidsScenes(ctx, W, H, st, t, u) {
+    switch (st.scene) {
+      case "arcoiris-ceu": {
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, "#56b4ff"); sky.addColorStop(1, "#d7f0ff");
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+        const R = Math.min(W * 0.55, H * 1.1);
+        ["#ff3b3b", "#ff9f1a", "#ffe23f", "#4cd964", "#2fa8ff", "#5856d6", "#b04cff"].forEach((c, k) => {
+          ctx.strokeStyle = c;
+          ctx.globalAlpha = 0.75;
+          ctx.lineWidth = R * 0.07;
+          ctx.beginPath(); ctx.arc(W / 2, H * 1.05, R - k * R * 0.07, Math.PI, 0); ctx.stroke();
+        });
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+        for (const c of CLOUDS) {
+          const s = H * 0.1 * c.s;
+          const x = drift(c.o, c.v, t, W + s * 6) - s * 3, y = c.y * H;
+          ctx.beginPath();
+          for (const [dx, dy, r] of [[0, 0, 1], [0.9, -0.3, 1.2], [1.9, 0, 0.95], [0.9, 0.3, 0.9]]) {
+            ctx.moveTo(x + dx * s + r * s, y + dy * s); ctx.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2);
+          }
+          ctx.fill();
+        }
+        return true;
+      }
+
+      case "bolinhas":
+        FALLERS.slice(0, 14).forEach((b, i) => {
+          const r = H * 0.06 * (0.6 + b.s * 0.5);
+          const x = r + tri(b.x * 2 + t * 0.12 * b.s) * (W - 2 * r);
+          const y = H - r - Math.abs(Math.sin(t * (1.6 + b.v * 6) + b.sw)) * H * 0.65;
+          ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+          ctx.beginPath(); ctx.ellipse(x, H - r * 0.15, r * 0.9, r * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = pc(i);
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+          shine(ctx, x, y, r);
+        });
+        return true;
+
+      case "peixes":
+        FALLERS.slice(0, 16).forEach((f, i) => {
+          const s = H * 0.05 * (0.6 + f.s * 0.6);
+          const dir = i % 2 ? 1 : -1;
+          const p = drift(f.o, f.v * 0.5, t, W + s * 8) - s * 4;
+          const x = dir > 0 ? p : W - p;
+          const y = (0.12 + 0.76 * f.x) * H + Math.sin(t * 1.5 + f.sw) * s * 0.6;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(dir, 1);
+          ctx.fillStyle = pc(i);
+          ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+          const wag = Math.sin(t * 10 + i) * s * 0.2;
+          ctx.beginPath(); ctx.moveTo(-s * 0.85, 0); ctx.lineTo(-s * 1.6, -s * 0.5 + wag); ctx.lineTo(-s * 1.6, s * 0.5 + wag); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath(); ctx.arc(s * 0.45, -s * 0.12, s * 0.16, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#111111";
+          ctx.beginPath(); ctx.arc(s * 0.5, -s * 0.12, s * 0.08, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        });
+        return true;
+
+      case "borboletas":
+        FLIES.slice(0, 16).forEach((b, i) => {
+          const x = (0.5 + 0.42 * Math.sin(t * 0.25 * b.f + b.a)) * W;
+          const y = (0.5 + 0.38 * Math.sin(t * 0.37 * b.f + b.b)) * H;
+          const s = H * 0.045;
+          const flap = 0.25 + 0.75 * Math.abs(Math.sin(t * 9 + i));
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.cos(t * 0.25 * b.f + b.a) * 0.6);
+          ctx.fillStyle = pc(i);
+          for (const side of [-1, 1]) {
+            ctx.beginPath(); ctx.ellipse(side * s * 0.55 * flap, -s * 0.3, s * 0.6 * flap, s * 0.5, side * 0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(side * s * 0.4 * flap, s * 0.35, s * 0.4 * flap, s * 0.35, -side * 0.4, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = "#2c2c2c";
+          ctx.fillRect(-s * 0.06, -s * 0.6, s * 0.12, s * 1.2);
+          ctx.restore();
+        });
+        return true;
+
+      case "pipoca":
+        for (let i = 0; i < 45; i++) {
+          const P = 1.8 + rnd(i * 3.1) * 1.4;
+          const q = ((t + rnd(i * 7.3) * P) % P) / P;
+          const x0 = W * (0.1 + 0.8 * rnd(i * 2.2)), vx = (rnd(i * 4.4) - 0.5) * W * 0.3;
+          const x = x0 + vx * q;
+          const y = H - (4 * q * (1 - q)) * H * (0.5 + rnd(i * 5.5) * 0.45) + H * 0.02;
+          const s = H * 0.025;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(q * 8 + i);
+          ctx.fillStyle = "#fffaf0";
+          ctx.beginPath();
+          for (const [dx, dy] of [[0, 0], [s * 0.8, s * 0.3], [-s * 0.6, s * 0.5], [s * 0.2, -s * 0.7]]) {
+            ctx.moveTo(dx + s * 0.75, dy); ctx.arc(dx, dy, s * 0.75, 0, Math.PI * 2);
+          }
+          ctx.fill();
+          ctx.fillStyle = "#f5c518";
+          ctx.beginPath(); ctx.arc(0, s * 0.2, s * 0.35, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+        ctx.fillStyle = "#c8102e";
+        for (let k = 0; k < 12; k++) if (k % 2 === 0) ctx.fillRect((k * W) / 12, H * 0.96, W / 12, H * 0.04);
+        return true;
+
+      case "planetas": {
+        ctx.fillStyle = "#ffffff";
+        for (const s of STARS) { ctx.globalAlpha = 0.3 + 0.4 * Math.abs(Math.sin(t + s.p)); ctx.fillRect(s.x * W, s.y * H, s.r * u, s.r * u); }
+        ctx.globalAlpha = 1;
+        const cx = W / 2, cy = H / 2;
+        const sun = ctx.createRadialGradient(cx, cy, 0, cx, cy, H * 0.16);
+        sun.addColorStop(0, "#fff6b0"); sun.addColorStop(0.5, "#ffb000"); sun.addColorStop(1, "rgba(255, 120, 0, 0)");
+        ctx.fillStyle = sun;
+        ctx.beginPath(); ctx.arc(cx, cy, H * 0.16, 0, Math.PI * 2); ctx.fill();
+        const planets = [[0.2, "#b0b0b0", 0.025, 1.6], [0.32, "#ffb86b", 0.04, 1.1], [0.45, "#3ec1d3", 0.045, 0.8], [0.6, "#ff6b4a", 0.035, 0.6], [0.78, "#e8c38a", 0.07, 0.4]];
+        planets.forEach(([orb, col, size, sp], i) => {
+          const a = t * sp * 0.6 + i * 1.7;
+          const rx = W * orb * 0.62, ry = H * orb * 0.62;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+          const x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry, r = H * size;
+          ctx.fillStyle = col;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+          if (i === 4) {
+            ctx.strokeStyle = "rgba(240, 220, 170, 0.8)";
+            ctx.lineWidth = r * 0.25;
+            ctx.beginPath(); ctx.ellipse(x, y, r * 1.8, r * 0.5, -0.3, 0, Math.PI * 2); ctx.stroke();
+          }
+        });
+        return true;
+      }
+
+      case "circo": {
+        const n = 16, sway = Math.sin(t * 0.8) * W * 0.03;
+        for (let k = 0; k < n; k++) {
+          ctx.fillStyle = k % 2 ? "#fff3e0" : "#c8102e";
+          ctx.beginPath();
+          ctx.moveTo(W / 2 + sway, -H * 0.25);
+          ctx.lineTo((k * W) / n - W * 0.1 + ((k * W) / n) * 0.2, H);
+          ctx.lineTo(((k + 1) * W) / n - W * 0.1 + (((k + 1) * W) / n) * 0.2, H);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+        ctx.fillRect(0, 0, W, H);
+        return true;
+      }
+
+      case "chuva":
+      case "tempestade": {
+        if (st.scene === "tempestade") {
+          const P = 3.2, q = (t % P) / P, k = Math.floor(t / P);
+          if (q < 0.08 && rnd(k) < 0.8) {
+            ctx.fillStyle = `rgba(220, 230, 255, ${0.5 * (1 - q / 0.08)})`;
+            ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = "#f4f7ff";
+            ctx.lineWidth = 3 * u;
+            ctx.shadowColor = "#bcd0ff"; ctx.shadowBlur = 20 * u;
+            ctx.beginPath();
+            let x = W * (0.2 + 0.6 * rnd(k * 3)), y = 0;
+            ctx.moveTo(x, y);
+            while (y < H * 0.8) { x += (rnd(x + y) - 0.5) * W * 0.06; y += H * 0.08; ctx.lineTo(x, y); }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+          }
+        }
+        ctx.strokeStyle = "rgba(170, 200, 255, 0.55)";
+        ctx.lineWidth = Math.max(1, 1.2 * u);
+        ctx.beginPath();
+        for (const d of RAIN) {
+          const len = H * 0.05 * d.l;
+          const y = drift(d.o, d.v, t, H + len * 2) - len;
+          const x = d.x * W + (y / H) * W * 0.05;
+          ctx.moveTo(x, y); ctx.lineTo(x + len * 0.15, y + len);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(170, 200, 255, 0.35)";
+        for (let i = 0; i < 10; i++) {
+          const q = (t * 1.5 + rnd(i * 3.3)) % 1;
+          ctx.beginPath(); ctx.ellipse(W * rnd(i * 7.7 + Math.floor(t * 1.5 + rnd(i * 3.3))), H * 0.97, q * 18 * u, q * 4 * u, 0, 0, Math.PI * 2); ctx.stroke();
+        }
+        return true;
+      }
+
+      case "ondas-cor": {
+        const maxR = Math.hypot(W, H) * 0.55;
+        ctx.lineWidth = H * 0.05;
+        for (let k = 0; k < 9; k++) {
+          const r = ((t * 0.18 + k / 9) % 1) * maxR;
+          ctx.strokeStyle = pc(k);
+          ctx.globalAlpha = 0.45 * (1 - r / maxR);
+          ctx.beginPath(); ctx.arc(W / 2, H / 2, r, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        return true;
+      }
+
+      case "caleidoscopio": {
+        ctx.save();
+        ctx.translate(W / 2, H / 2);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.3;
+        const R = Math.hypot(W, H) * 0.5;
+        for (let s = 0; s < 12; s++) {
+          ctx.save();
+          ctx.rotate((s / 12) * Math.PI * 2 + t * 0.2);
+          if (s % 2) ctx.scale(1, -1);
+          for (let k = 0; k < 4; k++) {
+            const d = R * (0.15 + 0.2 * k) * (0.8 + 0.2 * Math.sin(t + k));
+            ctx.fillStyle = pc(k + s);
+            ctx.beginPath();
+            ctx.arc(d, Math.sin(t * 0.7 + k) * d * 0.25, R * 0.06 * (1 + k * 0.4), 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+        ctx.restore();
+        return true;
+      }
+
+      case "lava": {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (let k = 0; k < 9; k++) {
+          const x = W * (0.5 + 0.4 * Math.sin(t * 0.15 * (1 + k * 0.13) + k * 2.1));
+          const y = H * (0.5 + 0.45 * Math.sin(t * 0.22 * (1 + k * 0.09) + k * 1.3));
+          const r = H * (0.25 + 0.12 * Math.sin(t * 0.3 + k));
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+          const col = ["#ff3b6b", "#ff8c1a", "#ffd23f", "#b04cff"][k % 4];
+          g.addColorStop(0, col + "aa"); g.addColorStop(0.6, col + "44"); g.addColorStop(1, col + "00");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+        return true;
+      }
+
+      case "pista": {
+        const cols = 12, rows = 7, cw = W / cols, ch = H / rows;
+        const beat = Math.floor(t * (1 + st.speed * 0.3));
+        for (let r = 0; r < rows; r++)
+          for (let c = 0; c < cols; c++) {
+            const on = rnd(r * 31 + c * 7 + beat * 13) > 0.55;
+            ctx.fillStyle = pc(Math.floor(rnd(r * 11 + c * 3 + beat) * 7));
+            ctx.globalAlpha = on ? 0.7 : 0.12;
+            ctx.fillRect(c * cw + 2, r * ch + 2, cw - 4, ch - 4);
+          }
+        ctx.globalAlpha = 1;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- stage, sky and retro backgrounds ----------
+  const PARTY_EMOJIS = ["🎉", "🎈", "🎂", "🎁", "🥳", "⭐", "🍭", "🎊", "🧁", "🎵"];
+  const LEAF_COLORS = ["#d35400", "#e67e22", "#f1c40f", "#c0392b", "#a04000"];
+  const plasmaCanvas = document.createElement("canvas");
+  const plasmaCtx = plasmaCanvas.getContext("2d");
+
+  // Colour emoji are slow to draw as text every frame, so each one is drawn once into an image.
+  const emojiSprites = new Map();
+  function emojiSprite(ch) {
+    if (!emojiSprites.has(ch)) {
+      const c = document.createElement("canvas");
+      c.width = c.height = 128;
+      const x = c.getContext("2d");
+      x.font = '100px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+      x.textAlign = "center";
+      x.textBaseline = "middle";
+      x.fillText(ch, 64, 70);
+      emojiSprites.set(ch, c);
+    }
+    return emojiSprites.get(ch);
+  }
+
+  function leafPath(ctx, s) {
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.quadraticCurveTo(s * 0.8, -s * 0.2, 0, s);
+    ctx.quadraticCurveTo(-s * 0.8, -s * 0.2, 0, -s);
+    ctx.closePath();
+  }
+
+  function snowflake(ctx, s) {
+    ctx.beginPath();
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2, c = Math.cos(a), si = Math.sin(a);
+      ctx.moveTo(0, 0); ctx.lineTo(c * s, si * s);
+      for (const d of [0.45, 0.7]) {
+        const bx = c * s * d, by = si * s * d, b = s * 0.25;
+        ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(a + 0.7) * b, by + Math.sin(a + 0.7) * b);
+        ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(a - 0.7) * b, by + Math.sin(a - 0.7) * b);
+      }
+    }
+    ctx.stroke();
+  }
+
+  function drawStageScenes(ctx, W, H, st, t, u) {
+    switch (st.scene) {
+      case "emojis":
+        FALLERS.slice(0, 26).forEach((e, i) => {
+          const s = H * 0.11 * (0.6 + e.s * 0.5);
+          const y = H + s - drift(e.o, e.v * 0.8, t, H + s * 2);
+          const x = e.x * W + Math.sin(t * 1.2 + e.sw) * 18 * u;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.sin(t * 1.8 + e.sw) * 0.35);
+          ctx.globalAlpha = 0.9;
+          ctx.drawImage(emojiSprite(PARTY_EMOJIS[i % PARTY_EMOJIS.length]), -s / 2, -s / 2, s, s);
+          ctx.restore();
+        });
+        return true;
+
+      case "estrelas-caindo":
+        ctx.shadowColor = "#ffd23f";
+        ctx.shadowBlur = 8 * u;
+        FALLERS.forEach((f, i) => {
+          const r = H * 0.022 * (0.6 + f.s * 0.7);
+          const y = drift(f.o, f.v * 1.2, t, H + r * 4) - r * 2;
+          const x = f.x * W + Math.sin(t + f.sw) * 10 * u;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(f.r + t * (i % 2 ? 1.5 : -1.5));
+          ctx.fillStyle = i % 4 ? "#ffd23f" : "#ffffff";
+          ctx.globalAlpha = 0.9;
+          ctx.beginPath(); starPath(ctx, 0, 0, r); ctx.fill();
+          ctx.restore();
+        });
+        ctx.shadowBlur = 0;
+        return true;
+
+      case "laser": {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        const sources = [[0, H], [W, H], [W / 2, 0]];
+        const len = Math.hypot(W, H) * 1.2;
+        sources.forEach(([sx, sy], si) => {
+          for (let k = 0; k < 8; k++) {
+            const base = si === 2 ? Math.PI / 2 : si === 0 ? -Math.PI / 4 : (-3 * Math.PI) / 4;
+            const a = base + Math.sin(t * (0.8 + k * 0.1) + k * 0.8 + si * 2) * 0.7;
+            const ex = sx + Math.cos(a) * len, ey = sy + Math.sin(a) * len;
+            const col = ["#ff2bd6", "#00e5ff", "#7bff5a", "#ffd23f"][(k + si) % 4];
+            const g = ctx.createLinearGradient(sx, sy, ex, ey);
+            g.addColorStop(0, col); g.addColorStop(1, col + "00");
+            ctx.strokeStyle = g;
+            ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 6 + k + si);
+            ctx.lineWidth = 2.2 * u;
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+          }
+        });
+        ctx.restore();
+        return true;
+      }
+
+      case "equalizador": {
+        // One path per colour band, filled once each.
+        const n = 32, bw = W / n, seg = H * 0.035, top = H * 0.75;
+        const bands = [[0.55, "#2bff6a"], [0.8, "#ffd23f"], [Infinity, "#ff3b3b"]];
+        const paths = bands.map(() => new Path2D());
+        for (let i = 0; i < n; i++) {
+          const lvl = 0.15 + 0.85 * Math.abs(Math.sin(t * (2 + rnd(i) * 3) + i) * Math.sin(t * 1.3 + i * 0.35));
+          const segs = Math.floor((lvl * top) / seg);
+          for (let k = 0; k < segs; k++) {
+            const f = (k * seg) / top;
+            paths[bands.findIndex(([lim]) => f < lim)].rect(i * bw + bw * 0.12, H - (k + 1) * seg + seg * 0.15, bw * 0.76, seg * 0.7);
+          }
+        }
+        ctx.globalAlpha = 0.55;
+        bands.forEach(([, col], b) => { ctx.fillStyle = col; ctx.fill(paths[b]); });
+        ctx.globalAlpha = 1;
+        return true;
+      }
+
+      case "cortina": {
+        const spot = ctx.createRadialGradient(W / 2, H * 0.55, 0, W / 2, H * 0.55, H * 0.7);
+        spot.addColorStop(0, "rgba(255, 244, 200, 0.35)"); spot.addColorStop(1, "rgba(255, 244, 200, 0)");
+        ctx.fillStyle = spot; ctx.fillRect(0, 0, W, H);
+        const cw = W * 0.17, folds = 6;
+        for (const side of [0, 1]) {
+          for (let k = 0; k < folds; k++) {
+            const fw = cw / folds;
+            const sway = Math.sin(t * 0.9 + k * 0.7) * fw * 0.15 * (k / folds);
+            const x = side === 0 ? k * fw + sway : W - (k + 1) * fw - sway;
+            const g = ctx.createLinearGradient(x, 0, x + fw, 0);
+            g.addColorStop(0, "#5a0010"); g.addColorStop(0.5, "#c8102e"); g.addColorStop(1, "#5a0010");
+            ctx.fillStyle = g;
+            ctx.fillRect(x - 1, 0, fw + 2, H);
+          }
+        }
+        const vh = H * 0.1, n = 10;
+        ctx.fillStyle = "#8a0018";
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W, 0); ctx.lineTo(W, vh * 0.6);
+        for (let k = n; k >= 0; k--) ctx.quadraticCurveTo(((k + 0.5) * W) / n, vh * 1.4, (k * W) / n, vh * 0.6);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#f5c518";
+        ctx.fillRect(0, vh * 0.5, W, vh * 0.08);
+        return true;
+      }
+
+      case "flashes":
+        for (let i = 0; i < 14; i++) {
+          const P = 0.7 + rnd(i * 3.3) * 1.3;
+          const tt = t + rnd(i * 5.7) * P;
+          const k = Math.floor(tt / P), q = (tt % P) / P;
+          if (q > 0.14 || rnd(i * 9 + k) < 0.3) continue;
+          const a = 1 - q / 0.14;
+          const x = W * rnd(i * 11 + k * 1.7), y = H * rnd(i * 13 + k * 2.3);
+          const r = H * 0.25;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+          g.addColorStop(0, `rgba(255, 255, 255, ${0.9 * a})`); g.addColorStop(1, "rgba(255, 255, 255, 0)");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
+          sparkle(ctx, x, y, H * 0.08 * a);
+        }
+        return true;
+
+      case "lua": {
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, "#050722"); sky.addColorStop(1, st.bg);
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#ffffff";
+        for (const s of STARS) {
+          ctx.globalAlpha = 0.2 + 0.8 * Math.abs(Math.sin(t * 1.1 + s.p));
+          ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r * u, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        const cx = W * 0.82, cy = H * 0.26, r = H * 0.15;
+        const halo = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 2.4);
+        halo.addColorStop(0, "rgba(255, 240, 180, 0.25)"); halo.addColorStop(1, "rgba(255, 240, 180, 0)");
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(cx, cy, r * 2.4, 0, Math.PI * 2); ctx.fill();
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, W, H);
+        ctx.arc(cx + r * 0.45, cy - r * 0.2, r * 0.95, 0, Math.PI * 2);
+        ctx.clip("evenodd");
+        ctx.fillStyle = "#fff2b0";
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        return true;
+      }
+
+      case "flocos":
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineCap = "round";
+        FALLERS.slice(0, 30).forEach((f) => {
+          const s = H * 0.035 * (0.5 + f.s * 0.8);
+          const y = drift(f.o, f.v * 0.7, t, H + s * 4) - s * 2;
+          const x = f.x * W + Math.sin(t * 0.7 + f.sw) * 20 * u;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(f.r + t * 0.4);
+          ctx.globalAlpha = 0.85;
+          ctx.lineWidth = Math.max(1, s * 0.09);
+          snowflake(ctx, s);
+          ctx.restore();
+        });
+        ctx.globalAlpha = 1;
+        return true;
+
+      case "folhas":
+        FALLERS.forEach((f, i) => {
+          const s = H * 0.03 * (0.6 + f.s * 0.7);
+          const y = drift(f.o, f.v * 0.7, t, H + s * 4) - s * 2;
+          const x = f.x * W + Math.sin(t * 0.8 + f.sw) * 40 * u;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(f.r + Math.sin(t * 1.5 + f.sw) * 1.2);
+          ctx.scale(Math.cos(t * 1.7 + f.sw), 1);
+          ctx.fillStyle = LEAF_COLORS[i % LEAF_COLORS.length];
+          ctx.globalAlpha = 0.9;
+          leafPath(ctx, s); ctx.fill();
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.25)";
+          ctx.lineWidth = Math.max(1, s * 0.08);
+          ctx.beginPath(); ctx.moveTo(0, -s * 0.8); ctx.lineTo(0, s); ctx.stroke();
+          ctx.restore();
+        });
+        return true;
+
+      case "foguetes":
+        ctx.fillStyle = "#ffffff";
+        for (const s of STARS) { ctx.globalAlpha = 0.25 + 0.4 * Math.abs(Math.sin(t + s.p)); ctx.fillRect(s.x * W, s.y * H, s.r * u, s.r * u); }
+        ctx.globalAlpha = 1;
+        for (let i = 0; i < 6; i++) {
+          const s = H * 0.07 * (0.7 + rnd(i * 4.3) * 0.6);
+          const P = 5 + rnd(i * 2.9) * 4;
+          const q = ((t + rnd(i * 7.1) * P) % P) / P;
+          const x = W * (0.08 + 0.84 * ((i + 0.5) / 6)) + Math.sin(q * 6 + i) * s * 0.3;
+          const y = H + s * 2 - q * (H + s * 5);
+          for (let k = 1; k <= 6; k++) {
+            ctx.fillStyle = `rgba(220, 220, 230, ${0.25 * (1 - k / 7)})`;
+            ctx.beginPath(); ctx.arc(x + Math.sin(t * 3 + k + i) * s * 0.15, y + s * (0.9 + k * 0.45), s * (0.2 + k * 0.07), 0, Math.PI * 2); ctx.fill();
+          }
+          const fl = s * (0.5 + 0.25 * Math.sin(t * 20 + i));
+          ctx.fillStyle = "#ffb000";
+          ctx.beginPath(); ctx.moveTo(x - s * 0.18, y + s * 0.55); ctx.lineTo(x, y + s * 0.55 + fl); ctx.lineTo(x + s * 0.18, y + s * 0.55); ctx.fill();
+          ctx.fillStyle = "#d0021b";
+          ctx.beginPath(); ctx.moveTo(x - s * 0.38, y + s * 0.6); ctx.lineTo(x - s * 0.2, y + s * 0.1); ctx.lineTo(x - s * 0.2, y + s * 0.6); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x + s * 0.38, y + s * 0.6); ctx.lineTo(x + s * 0.2, y + s * 0.1); ctx.lineTo(x + s * 0.2, y + s * 0.6); ctx.fill();
+          ctx.fillStyle = "#f2f2f2";
+          ctx.beginPath(); ctx.ellipse(x, y, s * 0.22, s * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#3ec1d3";
+          ctx.beginPath(); ctx.arc(x, y - s * 0.12, s * 0.1, 0, Math.PI * 2); ctx.fill();
+        }
+        return true;
+
+      case "avioes":
+        for (let i = 0; i < 8; i++) {
+          const s = H * 0.05 * (0.7 + rnd(i * 3.7) * 0.6);
+          const x = drift(rnd(i * 5.1), 0.04 + rnd(i * 2.2) * 0.05, t, W + s * 8) - s * 4;
+          const y = H * (0.15 + 0.7 * rnd(i * 6.6)) + Math.sin(t * 1.3 + i) * s * 0.8;
+          const tilt = Math.cos(t * 1.3 + i) * 0.25;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+          ctx.lineWidth = Math.max(1, s * 0.05);
+          ctx.setLineDash([s * 0.2, s * 0.25]);
+          ctx.beginPath();
+          for (let k = 0; k <= 12; k++) {
+            const tx = x - s * 0.8 - k * s * 0.35, ty = y + Math.sin(t * 1.3 + i - k * 0.12) * s * 0.8 - Math.sin(t * 1.3 + i) * s * 0.8;
+            k ? ctx.lineTo(tx, ty) : ctx.moveTo(tx, ty);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(tilt);
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.8, -s * 0.5); ctx.lineTo(-s * 0.4, 0); ctx.lineTo(-s * 0.8, s * 0.35); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = "#cfd8e3";
+          ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.4, 0); ctx.lineTo(-s * 0.8, s * 0.35); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+        return true;
+
+      case "tinta":
+        for (let i = 0; i < 10; i++) {
+          const P = 2.5 + rnd(i * 3.9) * 2;
+          const tt = t + rnd(i * 6.1) * P;
+          const k = Math.floor(tt / P), q = (tt % P) / P;
+          const seed = i * 50 + k * 3.3;
+          const x = W * rnd(seed), y = H * rnd(seed + 1);
+          const r = H * (0.08 + 0.08 * rnd(seed + 2)) * Math.min(1, q / 0.08);
+          ctx.globalAlpha = 0.75 * (q < 0.7 ? 1 : 1 - (q - 0.7) / 0.3);
+          ctx.fillStyle = pc(Math.floor(rnd(seed + 3) * 7));
+          ctx.beginPath();
+          ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2);
+          for (let d = 0; d < 9; d++) {
+            const a = rnd(seed + d * 1.9) * Math.PI * 2, dist = r * (1.1 + rnd(seed + d * 2.7) * 0.9), dr = r * (0.08 + rnd(seed + d) * 0.2);
+            ctx.moveTo(x + Math.cos(a) * dist + dr, y + Math.sin(a) * dist);
+            ctx.arc(x + Math.cos(a) * dist, y + Math.sin(a) * dist, dr, 0, Math.PI * 2);
+          }
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        return true;
+
+      case "plasma": {
+        const pw = 96, ph = Math.max(20, Math.round((96 * H) / W));
+        if (plasmaCanvas.width !== pw || plasmaCanvas.height !== ph) { plasmaCanvas.width = pw; plasmaCanvas.height = ph; }
+        const img = plasmaCtx.createImageData(pw, ph);
+        const d = img.data, cx = pw / 2 + Math.sin(t * 0.5) * pw * 0.3, cy = ph / 2 + Math.cos(t * 0.4) * ph * 0.3;
+        for (let y = 0, p = 0; y < ph; y++)
+          for (let x = 0; x < pw; x++, p += 4) {
+            const v = Math.sin(x * 0.16 + t) + Math.sin(y * 0.13 + t * 1.3) + Math.sin((x + y) * 0.1 + t * 0.7) +
+              Math.sin(Math.hypot(x - cx, y - cy) * 0.2 - t * 1.5);
+            d[p] = 90 + 90 * Math.sin(Math.PI * v * 0.5);
+            d[p + 1] = 90 + 90 * Math.sin(Math.PI * v * 0.5 + 2.1);
+            d[p + 2] = 90 + 90 * Math.sin(Math.PI * v * 0.5 + 4.2);
+            d[p + 3] = 255;
+          }
+        plasmaCtx.putImageData(img, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(plasmaCanvas, 0, 0, W, H);
+        return true;
+      }
+
+      case "tunel": {
+        const maxW = W * 1.1, maxH = H * 1.1;
+        for (let k = 0; k < 14; k++) {
+          const raw = (k / 14 + t * 0.2) % 1;
+          const s = raw * raw;
+          ctx.strokeStyle = pc(k + Math.floor(t * 0.2 + k / 14) * 3);
+          ctx.globalAlpha = Math.min(1, raw * 1.5) * 0.6;
+          ctx.lineWidth = Math.max(1, s * H * 0.06);
+          ctx.strokeRect(W / 2 - (maxW * s) / 2, H / 2 - (maxH * s) / 2, maxW * s, maxH * s);
+        }
+        ctx.globalAlpha = 1;
+        return true;
+      }
+
+      case "ondas-neon":
+        ["#ff2bd6", "#00e5ff", "#b983ff", "#ff2bd6", "#00e5ff", "#b983ff"].forEach((col, k) => {
+          ctx.strokeStyle = col;
+          ctx.shadowColor = col;
+          ctx.shadowBlur = 10 * u;
+          ctx.lineWidth = 2.2 * u;
+          ctx.globalAlpha = 0.7;
+          ctx.beginPath();
+          for (let x = 0; x <= W; x += 6) {
+            const y = H * (0.15 + 0.14 * k) + Math.sin((x / W) * (4 + k) * Math.PI + t * (1 + k * 0.3) * (k % 2 ? -1 : 1)) * H * 0.05;
+            x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+          }
+          ctx.stroke();
+        });
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        return true;
+
+      case "xadrez-rolando": {
+        const sz = H / 5, off = (t * sz * 0.6) % (sz * 2);
+        ctx.save();
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(-0.4);
+        ctx.fillStyle = st.fx;
+        ctx.globalAlpha = 0.3;
+        const R = Math.hypot(W, H) / 2 + sz * 2;
+        for (let y = -R; y < R; y += sz)
+          for (let x = -R; x < R; x += sz)
+            if ((Math.round((x + R) / sz) + Math.round((y + R) / sz)) % 2 === 0) ctx.fillRect(x + off, y + off, sz, sz);
+        ctx.restore();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- more party borders ----------
+  // Evenly spaced x positions along a row, n = how many fit at the given spacing.
+  const rowXs = (W, gap) => {
+    const n = Math.max(2, Math.round(W / gap));
+    return Array.from({ length: n }, (_, i) => ((i + 0.5) * W) / n);
+  };
+  function band(ctx, W, H, B) {
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.rect(B, B, W - 2 * B, H - 2 * B);
+  }
+  function shine(ctx, x, y, r) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+    ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.28, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawMoreBorders(ctx, L, st, t) {
+    const { W, H, B, dpr } = L;
+    switch (st.border) {
+      case "neon-borda": {
+        const col = `hsl(${(t * 40) % 360} 100% 60%)`;
+        ctx.strokeStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = B * 1.4 * dpr;
+        ctx.lineWidth = B * 0.35;
+        ctx.strokeRect(B / 2, B / 2, W - B, H - B);
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.lineWidth = B * 0.1;
+        ctx.strokeRect(B / 2, B / 2, W - B, H - B);
+        return true;
+      }
+
+      case "arcoiris-borda": {
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(k * 60 + t * 80) % 360} 95% 58%)`);
+        ctx.fillStyle = g;
+        band(ctx, W, H, B);
+        ctx.fill("evenodd");
+        return true;
+      }
+
+      case "confete-borda":
+        for (let i = 0; i < 220; i++) {
+          const side = Math.floor(rnd(i * 1.3) * 4);
+          const along = rnd(i * 2.7), across = rnd(i * 3.9) * B;
+          const [x, y] = side === 0 ? [along * W, across] : side === 1 ? [along * W, H - across]
+            : side === 2 ? [across, along * H] : [W - across, along * H];
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(rnd(i * 5.1) * 6.28 + t * (i % 2 ? 1 : -1));
+          ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(t * 2 + i));
+          ctx.fillStyle = pc(i);
+          if (i % 3) ctx.fillRect(-B * 0.14, -B * 0.07, B * 0.28, B * 0.14);
+          else { ctx.beginPath(); ctx.arc(0, 0, B * 0.1, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+        }
+        return true;
+
+      case "corrente": {
+        ctx.lineWidth = B * 0.17;
+        const link = (x, y, i, vertical) => {
+          ctx.strokeStyle = pc(i);
+          ctx.beginPath();
+          const big = i % 2 === 0;
+          const rx = big ? B * 0.45 : B * 0.12, ry = big ? B * 0.26 : B * 0.3;
+          ctx.ellipse(x, y, vertical ? ry : rx, vertical ? rx : ry, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        };
+        const wave = (i) => Math.sin(t * 2 + i * 0.5) * B * 0.06;
+        rowXs(W, B * 0.62).forEach((x, i) => { link(x, B / 2 + wave(i), i, false); link(x, H - B / 2 - wave(i), i + 1, false); });
+        rowXs(H - 2 * B, B * 0.62).forEach((y, i) => { link(B / 2, B + y, i, true); link(W - B / 2, B + y, i + 1, true); });
+        return true;
+      }
+
+      case "laco": {
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#ff3355"); g.addColorStop(0.5, "#c8102e"); g.addColorStop(1, "#ff3355");
+        ctx.fillStyle = g;
+        band(ctx, W, H, B);
+        ctx.fill("evenodd");
+        const s = B * 2.2 * (1 + 0.05 * Math.sin(t * 3));
+        ctx.save();
+        ctx.translate(W / 2, B * 0.6);
+        ctx.fillStyle = "#e0102a";
+        for (const dir of [-1, 1]) {
+          ctx.beginPath(); ctx.ellipse(dir * s * 0.45, 0, s * 0.45, s * 0.28, dir * 0.35, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(dir * s * 0.08, s * 0.1); ctx.lineTo(dir * s * 0.4, s * 0.85); ctx.lineTo(dir * s * 0.22, s * 0.75); ctx.lineTo(dir * s * 0.05, s * 0.85); ctx.closePath(); ctx.fill();
+        }
+        ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+        for (const dir of [-1, 1]) { ctx.beginPath(); ctx.ellipse(dir * s * 0.45, -s * 0.06, s * 0.28, s * 0.1, dir * 0.35, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = "#a30016";
+        ctx.beginPath(); ctx.arc(0, 0, s * 0.15, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        return true;
+      }
+
+      case "velas":
+        rowXs(W, B * 0.75).forEach((x, i) => {
+          const w = B * 0.2, h = B * 0.52, base = H - B * 0.08;
+          ctx.fillStyle = pc(i);
+          ctx.fillRect(x - w / 2, base - h, w, h);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+          for (let k = 0; k < 3; k++) ctx.fillRect(x - w / 2, base - h + h * (0.15 + k * 0.3), w, h * 0.08);
+          const fl = 1 + 0.15 * Math.sin(t * 12 + i * 2) + 0.1 * rnd(Math.floor(t * 10) + i);
+          const fy = base - h - B * 0.05;
+          ctx.save();
+          ctx.shadowColor = "#ffb000";
+          ctx.shadowBlur = B * 0.6 * dpr;
+          ctx.fillStyle = "#ffcc33";
+          ctx.beginPath();
+          ctx.moveTo(x, fy - B * 0.28 * fl);
+          ctx.quadraticCurveTo(x + B * 0.12, fy - B * 0.08, x, fy);
+          ctx.quadraticCurveTo(x - B * 0.12, fy - B * 0.08, x, fy - B * 0.28 * fl);
+          ctx.fill();
+          ctx.fillStyle = "#fff6d0";
+          ctx.beginPath(); ctx.ellipse(x, fy - B * 0.07, B * 0.03, B * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        });
+        rowXs(W, B * 0.5).forEach((x, i) => {
+          ctx.fillStyle = pc(i + 3);
+          ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(t * 2 + i));
+          ctx.beginPath(); ctx.arc(x, B * 0.3, B * 0.07, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        return true;
+
+      case "chapeus":
+        rowXs(W, B * 0.95).forEach((x, i) => {
+          const w = B * 0.6, h = B * 0.8, base = H - B * 0.08;
+          ctx.save();
+          ctx.translate(x, base);
+          ctx.rotate(Math.sin(t * 2.5 + i) * 0.12);
+          ctx.fillStyle = pc(i);
+          ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.lineTo(0, -h); ctx.closePath(); ctx.fill();
+          ctx.save(); ctx.clip();
+          ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+          for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc((k % 2 ? 0.12 : -0.12) * w, -h * (0.2 + k * 0.2), B * 0.06, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+          ctx.fillStyle = pc(i + 2);
+          ctx.beginPath(); ctx.arc(0, -h, B * 0.1, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        });
+        rowXs(W, B * 0.95).forEach((x, i) => {
+          ctx.strokeStyle = pc(i + 1);
+          ctx.lineWidth = B * 0.06;
+          ctx.beginPath();
+          for (let k = 0; k <= 10; k++) ctx.lineTo(x - B * 0.3 + k * B * 0.06, B * 0.3 + Math.sin(k + t * 4 + i) * B * 0.08);
+          ctx.stroke();
+        });
+        return true;
+
+      case "presentes":
+        rowXs(W, B * 1.05).forEach((x, i) => {
+          const s = B * 0.62;
+          const hop = Math.max(0, Math.sin(t * 3 + i * 0.9)) * B * 0.12;
+          const y = H - B * 0.08 - s - hop;
+          ctx.fillStyle = pc(i);
+          ctx.fillRect(x - s / 2, y, s, s);
+          ctx.fillStyle = pc(i + 3);
+          ctx.fillRect(x - s * 0.08, y, s * 0.16, s);
+          ctx.fillRect(x - s / 2, y + s * 0.4, s, s * 0.16);
+          ctx.beginPath();
+          ctx.ellipse(x - s * 0.18, y - s * 0.06, s * 0.18, s * 0.1, 0.4, 0, Math.PI * 2);
+          ctx.ellipse(x + s * 0.18, y - s * 0.06, s * 0.18, s * 0.1, -0.4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        rowXs(W, B * 0.5).forEach((x, i) => {
+          ctx.fillStyle = pc(i + 1);
+          ctx.fillRect(x - B * 0.12, B * 0.25, B * 0.24, B * 0.08);
+        });
+        return true;
+
+      case "pirulitos":
+        borderPoints(W, H, B / 2, B * 1.1).forEach(([x, y], i) => {
+          const r = B * 0.38;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(t * 2 * (i % 2 ? 1 : -1));
+          ctx.fillStyle = pc(i);
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+          ctx.lineWidth = r * 0.16;
+          ctx.beginPath();
+          for (let a = 0; a < Math.PI * 6; a += 0.2) {
+            const rr = (a / (Math.PI * 6)) * r * 0.9;
+            a ? ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : ctx.moveTo(0, 0);
+          }
+          ctx.stroke();
+          ctx.restore();
+        });
+        return true;
+
+      case "coroas":
+        borderPoints(W, H, B / 2, B * 1.2).forEach(([x, y], i) => {
+          const w = B * 0.8, h = B * 0.55;
+          ctx.save();
+          ctx.translate(x, y + Math.sin(t * 2 + i) * B * 0.05);
+          ctx.shadowColor = "#ffd23f";
+          ctx.shadowBlur = B * 0.3 * dpr;
+          ctx.fillStyle = "#f5c518";
+          ctx.beginPath();
+          ctx.moveTo(-w / 2, h / 2); ctx.lineTo(w / 2, h / 2); ctx.lineTo(w / 2, -h / 2);
+          ctx.lineTo(w / 4, 0); ctx.lineTo(0, -h / 2); ctx.lineTo(-w / 4, 0); ctx.lineTo(-w / 2, -h / 2);
+          ctx.closePath(); ctx.fill();
+          ctx.shadowBlur = 0;
+          [[-w / 2, -h / 2, "#ff4d6d"], [0, -h / 2, "#3ec1d3"], [w / 2, -h / 2, "#b983ff"]].forEach(([gx, gy, c]) => {
+            ctx.fillStyle = c; ctx.beginPath(); ctx.arc(gx, gy, B * 0.07, 0, Math.PI * 2); ctx.fill();
+          });
+          ctx.fillStyle = "#ff4d6d";
+          ctx.beginPath(); ctx.arc(0, h * 0.2, B * 0.07, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        });
+        return true;
+
+      case "raios":
+        borderPoints(W, H, B / 2, B * 1.1).forEach(([x, y], i) => {
+          const on = rnd(Math.floor(t * 6) * 7 + i) > 0.3;
+          const s = B * 0.45;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate((i % 2 ? 1 : -1) * 0.25);
+          ctx.globalAlpha = on ? 1 : 0.35;
+          if (on) { ctx.shadowColor = "#fff27a"; ctx.shadowBlur = B * 0.5 * dpr; }
+          ctx.fillStyle = "#ffd23f";
+          ctx.beginPath();
+          ctx.moveTo(s * 0.15, -s); ctx.lineTo(-s * 0.45, s * 0.1); ctx.lineTo(-s * 0.02, s * 0.1);
+          ctx.lineTo(-s * 0.2, s); ctx.lineTo(s * 0.45, -s * 0.15); ctx.lineTo(s * 0.05, -s * 0.15);
+          ctx.closePath(); ctx.fill();
+          ctx.restore();
+        });
+        return true;
+
+      case "guirlanda": {
+        const n = Math.max(2, Math.round(W / (B * 2.2)));
+        const sg = W / n, sag = B * 0.35;
+        const yAt = (y0, x) => y0 + sag * Math.sin(Math.PI * ((x % sg) / sg));
+        for (const y0 of [B * 0.25, H - B * 0.85]) {
+          ctx.strokeStyle = "#1f7a3a";
+          ctx.lineWidth = B * 0.32;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          for (let x = 0; x <= W; x += 4) x ? ctx.lineTo(x, yAt(y0, x)) : ctx.moveTo(x, yAt(y0, x));
+          ctx.stroke();
+          ctx.strokeStyle = "#2fa052";
+          ctx.lineWidth = B * 0.08;
+          ctx.setLineDash([B * 0.1, B * 0.12]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          for (let i = 0; i < n; i++) {
+            const x = (i + 0.5) * sg, y = yAt(y0, x) + B * 0.1;
+            const r = B * 0.16;
+            ctx.fillStyle = i % 2 ? "#f5c518" : "#d0021b";
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+            shine(ctx, x, y, r);
+          }
+        }
+        return true;
+      }
+
+      case "bolas-natal":
+        rowXs(W, B * 0.9).forEach((x, i) => {
+          const len = B * (0.25 + 0.45 * rnd(i * 3.3));
+          const ang = Math.sin(t * 1.6 + i * 0.8) * 0.18;
+          const r = B * 0.22;
+          const bx = x + Math.sin(ang) * len, by = Math.cos(ang) * len;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.lineWidth = Math.max(1, B * 0.02);
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(bx, by); ctx.stroke();
+          ctx.fillStyle = "#c9a227";
+          ctx.fillRect(bx - r * 0.3, by - r * 0.1, r * 0.6, r * 0.3);
+          ctx.fillStyle = ["#d0021b", "#f5c518", "#1f7a3a", "#3ec1d3", "#b983ff"][i % 5];
+          ctx.beginPath(); ctx.arc(bx, by + r, r, 0, Math.PI * 2); ctx.fill();
+          shine(ctx, bx, by + r, r);
+        });
+        return true;
+
+      case "aboboras":
+        borderPoints(W, H, B / 2, B * 1.15).forEach(([x, y], i) => {
+          const r = B * 0.4;
+          ctx.fillStyle = "#ff7a1a";
+          ctx.beginPath(); ctx.ellipse(x, y, r * 1.1, r * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#c25400";
+          ctx.lineWidth = r * 0.08;
+          for (const k of [-0.45, 0, 0.45]) { ctx.beginPath(); ctx.ellipse(x + k * r, y, r * 0.35, r * 0.82, 0, 0, Math.PI * 2); ctx.stroke(); }
+          ctx.fillStyle = "#2f7d00";
+          ctx.fillRect(x - r * 0.08, y - r * 1.05, r * 0.16, r * 0.25);
+          const glow = 0.6 + 0.4 * rnd(Math.floor(t * 8) + i);
+          ctx.fillStyle = `rgba(255, 230, 80, ${glow})`;
+          ctx.beginPath();
+          ctx.moveTo(x - r * 0.5, y - r * 0.1); ctx.lineTo(x - r * 0.25, y - r * 0.4); ctx.lineTo(x - r * 0.05, y - r * 0.1);
+          ctx.moveTo(x + r * 0.05, y - r * 0.1); ctx.lineTo(x + r * 0.25, y - r * 0.4); ctx.lineTo(x + r * 0.5, y - r * 0.1);
+          ctx.moveTo(x - r * 0.5, y + r * 0.2); ctx.lineTo(x + r * 0.5, y + r * 0.2); ctx.lineTo(x, y + r * 0.5);
+          ctx.fill();
+        });
+        return true;
+
+      case "ovos":
+        borderPoints(W, H, B / 2, B * 1.05).forEach(([x, y], i) => {
+          const rx = B * 0.3, ry = B * 0.4;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.sin(t * 3 + i) * 0.15);
+          ctx.fillStyle = ["#ffb3de", "#b5e8ff", "#fff3a3", "#c8f7c5", "#e0c3ff"][i % 5];
+          ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.save(); ctx.clip();
+          ctx.strokeStyle = pc(i);
+          ctx.lineWidth = B * 0.06;
+          ctx.beginPath();
+          for (let k = 0; k <= 8; k++) ctx.lineTo(-rx + (k * 2 * rx) / 8, (k % 2 ? -1 : 1) * ry * 0.12);
+          ctx.stroke();
+          ctx.fillStyle = pc(i + 2);
+          for (const dy of [-0.55, 0.5]) { ctx.beginPath(); ctx.arc(0, dy * ry, B * 0.05, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+          ctx.restore();
+        });
+        return true;
+
+      case "cintilantes":
+        borderPoints(W, H, B / 2, B * 0.8).forEach(([x, y], i) => {
+          const s = Math.max(0, Math.sin(t * 3 + i * 1.7)) * B * 0.45;
+          if (s < 0.5) return;
+          ctx.fillStyle = ["#ffffff", "#ffd23f", "#ff9ed8"][i % 3];
+          ctx.shadowColor = ctx.fillStyle;
+          ctx.shadowBlur = B * 0.4 * dpr;
+          sparkle(ctx, x, y, s);
+        });
+        ctx.shadowBlur = 0;
+        return true;
+    }
+    return false;
+  }
+
+  // ---------- party borders ----------
+  function drawPartyBorder(ctx, L, st, t) {
+    const { W, H, B, dpr } = L;
+    if (drawMoreBorders(ctx, L, st, t)) return;
+    switch (st.border) {
+      case "bandeirinhas": {
+        const fw = B * 0.85, fh = B * 0.8;
+        const n = Math.max(3, Math.round(W / (fw * 1.15)));
+        for (const [row, y] of [[0, B * 0.12], [1, H - B * 0.98]]) {
+          ctx.strokeStyle = "#f2e6c9";
+          ctx.lineWidth = Math.max(1, B * 0.03);
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+          for (let i = 0; i < n; i++) {
+            const x = ((i + 0.5) * W) / n;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(Math.sin(t * 2.2 + i * 0.8 + row * 2) * 0.12);
+            ctx.fillStyle = pc(i + row * 3);
+            ctx.beginPath(); ctx.moveTo(-fw / 2, 0); ctx.lineTo(fw / 2, 0); ctx.lineTo(0, fh); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+            ctx.beginPath(); ctx.moveTo(-fw / 2, 0); ctx.lineTo(fw / 2, 0); ctx.lineTo(fw * 0.4, fh * 0.12); ctx.lineTo(-fw * 0.4, fh * 0.12); ctx.closePath(); ctx.fill();
+            ctx.restore();
+          }
+        }
+        break;
+      }
+
+      case "pisca": {
+        const n = Math.max(2, Math.round(W / Math.max(B * 2.6, 40)));
+        const sg = W / n, sag = B * 0.3;
+        const wireY = (y0, x) => y0 + sag * Math.sin(Math.PI * ((x % sg) / sg));
+        const blink = Math.floor(t * (0.8 + st.speed * 0.25));
+        for (const [row, y0] of [[0, B * 0.12], [1, H - B * 0.8]]) {
+          ctx.strokeStyle = "#1f6b35";
+          ctx.lineWidth = Math.max(1.5, B * 0.05);
+          ctx.beginPath();
+          for (let x = 0; x <= W; x += 4) x ? ctx.lineTo(x, wireY(y0, x)) : ctx.moveTo(x, wireY(y0, x));
+          ctx.stroke();
+          for (let i = 0; i < n * 2; i++) {
+            const x = (i + 0.5) * (sg / 2);
+            const y = wireY(y0, x);
+            const on = (i + row + blink) % 3 !== 0;
+            const col = pc(i * 2 + row);
+            ctx.fillStyle = "#2c2c2c";
+            ctx.fillRect(x - B * 0.05, y, B * 0.1, B * 0.09);
+            ctx.globalAlpha = on ? 1 : 0.3;
+            if (on) { ctx.shadowColor = col; ctx.shadowBlur = B * 0.6 * dpr; }
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.ellipse(x, y + B * 0.24, B * 0.1, B * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+          }
+        }
+        break;
+      }
+
+      case "baloes": {
+        const r = H * 0.085;
+        const corners = [[r * 1.3, r * 1.25], [W - r * 1.3, r * 1.25], [r * 1.3, H - r * 1.1], [W - r * 1.3, H - r * 1.1]];
+        const cluster = [[-0.8, 0.15], [0.8, 0.25], [0, -0.75]];
+        corners.forEach(([cx, cy], ci) => {
+          cluster.forEach(([dx, dy], k) => {
+            const bob = Math.sin(t * 1.6 + ci * 1.3 + k * 2) * r * 0.12;
+            balloon(ctx, cx + dx * r, cy + dy * r + bob, r * 0.9, pc(ci * 3 + k), t, ci + k);
+          });
+        });
+        break;
+      }
+
+      case "estrelas-girando": {
+        const pts = borderPoints(W, H, B / 2, B * 1.1);
+        ctx.shadowColor = "#ffd23f";
+        ctx.shadowBlur = B * 0.35 * dpr;
+        pts.forEach(([x, y], i) => {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(t * 1.3 * (i % 2 ? 1 : -1));
+          ctx.fillStyle = i % 3 ? "#ffd23f" : "#ffffff";
+          ctx.beginPath(); starPath(ctx, 0, 0, B * 0.38 * (0.85 + 0.15 * Math.sin(t * 3 + i))); ctx.fill();
+          ctx.restore();
+        });
+        ctx.shadowBlur = 0;
+        break;
+      }
+
+      case "coracoes": {
+        const pts = borderPoints(W, H, B / 2, B * 1.05);
+        pts.forEach(([x, y], i) => {
+          const s = B * 0.72 * (1 + 0.15 * Math.sin(t * 4 - i * 0.5));
+          ctx.fillStyle = i % 2 ? "#ff99c8" : "#ff4d6d";
+          ctx.beginPath(); heartPath(ctx, x, y - s / 2, s); ctx.fill();
+        });
+        break;
+      }
+
+      case "flores": {
+        const pts = borderPoints(W, H, B / 2, B * 1.1);
+        pts.forEach(([x, y], i) => {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(t * 0.6 + i);
+          ctx.fillStyle = pc(i);
+          ctx.beginPath();
+          for (let p = 0; p < 5; p++) {
+            const a = (p / 5) * Math.PI * 2;
+            ctx.moveTo(Math.cos(a) * B * 0.2 + B * 0.16, Math.sin(a) * B * 0.2);
+            ctx.arc(Math.cos(a) * B * 0.2, Math.sin(a) * B * 0.2, B * 0.16, 0, Math.PI * 2);
+          }
+          ctx.fill();
+          ctx.fillStyle = "#ffd23f";
+          ctx.beginPath(); ctx.arc(0, 0, B * 0.11, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        });
+        break;
+      }
+
+      case "bengala": {
+        const p = Math.max(6, Math.round(B * 0.5));
+        const pat = ctx.createPattern(patternTile("listras", p, "#ffffff", "#e0102a"), "repeat");
+        if (pat.setTransform) pat.setTransform(new DOMMatrix().translate((t * p * 1.2) % (p * 2), 0));
+        ctx.fillStyle = pat;
+        ctx.beginPath();
+        ctx.rect(0, 0, W, H);
+        ctx.rect(B, B, W - 2 * B, H - 2 * B);
+        ctx.fill("evenodd");
+        break;
+      }
+    }
+  }
+
+  // ---------- transitions (old look → new look) ----------
+  const TRANSITIONS = {
+    dissolver: "Dissolver", escuro: "Apagar e acender", flash: "Flash de câmera", zoom: "Zoom para fora",
+    "deslizar-esq": "Deslizar para a esquerda", "deslizar-dir": "Deslizar para a direita", subir: "Subir", descer: "Cair",
+    limpar: "Limpador", diagonal: "Diagonal", cortina: "Cortina de teatro",
+    circulo: "Círculo abrindo", estrela: "Estrela abrindo", coracao: "Coração abrindo",
+    persiana: "Persiana", "persiana-v": "Persiana vertical", xadrez: "Xadrez",
+    redemoinho: "Redemoinho", pixelar: "Pixelar", glitch: "Glitch", quebrar: "Quebrar em pedaços",
+  };
+  const snap = document.createElement("canvas");
+  const snapCtx = snap.getContext("2d");
+  const tiny = document.createElement("canvas");
+  const tinyCtx = tiny.getContext("2d");
+  let trans = null;
+  let lastTransition = "";
+
+  // Freezes the current picture; the next frames blend from it into the new look.
+  function startTransition() {
+    if (!cv.width || !cv.height) return;
+    snap.width = cv.width;
+    snap.height = cv.height;
+    snapCtx.drawImage(cv, 0, 0);
+    const sel = $("transicao").value;
+    const keys = Object.keys(TRANSITIONS);
+    let kind = sel;
+    if (sel === "sorteada") {
+      do { kind = keys[Math.floor(Math.random() * keys.length)]; } while (kind === lastTransition && keys.length > 1);
+    }
+    lastTransition = kind;
+    trans = { kind, t: 0, dur: +$("duracao").value, seed: Math.random() * 1000 };
+  }
+
+  const easeInOut = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
+
+  function irisClip(ctx, W, H, shape, e) {
+    const cx = W / 2, cy = H / 2, R = Math.hypot(W, H) * 0.5 * e;
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    if (shape === "circulo") ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    else if (shape === "estrela") starPath(ctx, cx, cy, R * 1.9);
+    else heartPath(ctx, cx, cy - R * 1.25, R * 2.5);
+    ctx.clip("evenodd");
+  }
+
+  function drawTransition(ctx, tr, p) {
+    const W = cv.width, H = cv.height;
+    const e = easeInOut(p);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    switch (tr.kind) {
+      case "dissolver":
+        ctx.globalAlpha = 1 - e; ctx.drawImage(snap, 0, 0); break;
+      case "escuro":
+      case "flash": {
+        const col = tr.kind === "flash" ? "255, 255, 255" : "0, 0, 0";
+        if (p < 0.5) {
+          ctx.drawImage(snap, 0, 0);
+          ctx.fillStyle = `rgba(${col}, ${(p * 2).toFixed(3)})`;
+        } else ctx.fillStyle = `rgba(${col}, ${((1 - p) * 2).toFixed(3)})`;
+        ctx.fillRect(0, 0, W, H);
+        break;
+      }
+      case "zoom": {
+        const s = 1 + e * 0.9;
+        ctx.globalAlpha = 1 - e;
+        ctx.drawImage(snap, W / 2 - (W * s) / 2, H / 2 - (H * s) / 2, W * s, H * s);
+        break;
+      }
+      case "deslizar-esq": ctx.drawImage(snap, -e * W, 0); break;
+      case "deslizar-dir": ctx.drawImage(snap, e * W, 0); break;
+      case "subir": ctx.drawImage(snap, 0, -e * H); break;
+      case "descer": ctx.drawImage(snap, 0, p * p * H); break;
+      case "limpar":
+        ctx.beginPath(); ctx.rect(e * W, 0, W, H); ctx.clip();
+        ctx.drawImage(snap, 0, 0);
+        ctx.fillStyle = "#fcfc54"; ctx.fillRect(e * W - 3, 0, 6, H);
+        break;
+      case "diagonal": {
+        const k = e * (W + H * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(k, 0); ctx.lineTo(W + H, 0); ctx.lineTo(W + H, H); ctx.lineTo(k - H * 0.5, H);
+        ctx.closePath(); ctx.clip();
+        ctx.drawImage(snap, 0, 0);
+        break;
+      }
+      case "cortina": {
+        const half = W / 2, off = e * half;
+        ctx.drawImage(snap, 0, 0, half, H, -off, 0, half, H);
+        ctx.drawImage(snap, half, 0, half, H, half + off, 0, half, H);
+        const edge = Math.max(8, W * 0.02);
+        const g1 = ctx.createLinearGradient(half - off - edge, 0, half - off, 0);
+        g1.addColorStop(0, "rgba(160, 0, 20, 0)"); g1.addColorStop(1, "rgba(160, 0, 20, 0.9)");
+        ctx.fillStyle = g1; ctx.fillRect(half - off - edge, 0, edge, H);
+        const g2 = ctx.createLinearGradient(half + off, 0, half + off + edge, 0);
+        g2.addColorStop(0, "rgba(160, 0, 20, 0.9)"); g2.addColorStop(1, "rgba(160, 0, 20, 0)");
+        ctx.fillStyle = g2; ctx.fillRect(half + off, 0, edge, H);
+        break;
+      }
+      case "circulo":
+      case "estrela":
+      case "coracao":
+        irisClip(ctx, W, H, tr.kind, e);
+        ctx.drawImage(snap, 0, 0);
+        break;
+      case "persiana": {
+        const n = 10, bh = H / n, h = (1 - e) * bh;
+        for (let k = 0; k < n; k++) if (h > 0.5) ctx.drawImage(snap, 0, k * bh, W, h, 0, k * bh, W, h);
+        break;
+      }
+      case "persiana-v": {
+        const n = 14, bw = W / n, w = (1 - e) * bw;
+        for (let k = 0; k < n; k++) if (w > 0.5) ctx.drawImage(snap, k * bw, 0, w, H, k * bw, 0, w, H);
+        break;
+      }
+      case "xadrez": {
+        const cols = 16, rows = 9, cw = W / cols, ch = H / rows;
+        for (let r = 0; r < rows; r++)
+          for (let c = 0; c < cols; c++)
+            if (p < rnd(tr.seed + c * 31 + r * 7) * 0.85 + 0.1)
+              ctx.drawImage(snap, c * cw, r * ch, cw, ch, c * cw, r * ch, cw, ch);
+        break;
+      }
+      case "redemoinho":
+        ctx.globalAlpha = 1 - e * 0.4;
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(e * Math.PI * 1.6);
+        ctx.scale(Math.max(0.001, 1 - e), Math.max(0.001, 1 - e));
+        ctx.drawImage(snap, -W / 2, -H / 2);
+        break;
+      case "pixelar": {
+        const bs = 1 + p * Math.max(W, H) * 0.05;
+        tiny.width = Math.max(1, Math.ceil(W / bs));
+        tiny.height = Math.max(1, Math.ceil(H / bs));
+        tinyCtx.drawImage(snap, 0, 0, tiny.width, tiny.height);
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha = p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4;
+        ctx.drawImage(tiny, 0, 0, tiny.width, tiny.height, 0, 0, W, H);
+        ctx.imageSmoothingEnabled = true;
+        break;
+      }
+      case "glitch": {
+        const n = 16, bh = H / n, tick = Math.floor(p * 18);
+        for (let k = 0; k < n; k++) {
+          if (rnd(tr.seed + k * 3.1) < e) continue;
+          const dx = (rnd(tr.seed + k * 5.7 + tick) - 0.5) * W * 0.25 * e;
+          ctx.drawImage(snap, 0, k * bh, W, bh, dx, k * bh, W, bh);
+          if (rnd(tr.seed + k + tick * 1.3) < 0.25) {
+            ctx.fillStyle = rnd(k + tick) < 0.5 ? "rgba(255, 32, 80, 0.35)" : "rgba(0, 229, 255, 0.35)";
+            ctx.fillRect(0, k * bh, W, bh);
+          }
+        }
+        break;
+      }
+      case "quebrar": {
+        const cols = 10, rows = 6, tw = W / cols, th = H / rows;
+        for (let r = 0; r < rows; r++)
+          for (let c = 0; c < cols; c++) {
+            const i = r * cols + c;
+            const q = Math.min(1, Math.max(0, (p - rnd(tr.seed + i) * 0.45) / 0.55));
+            if (q >= 1) continue;
+            ctx.save();
+            ctx.translate(c * tw + tw / 2 + (rnd(tr.seed + i * 2) - 0.5) * q * W * 0.2, r * th + th / 2 + q * q * H * 1.3);
+            ctx.rotate((rnd(tr.seed + i * 3) - 0.5) * q * 3);
+            ctx.drawImage(snap, c * tw, r * th, tw, th, -tw / 2, -th / 2, tw, th);
+            ctx.restore();
+          }
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------- loop ----------
+  const cv = $("display");
+  const ctx = cv.getContext("2d");
+  let st = readState();
+  let L = null;
+  let pos = 0, phase = 0, clock = 0;
+  let paused = false;
+  let last = performance.now();
+  let autoTimer = 0, shuffleTimer = 0, statusTick = 0;
+
+  function relayout() {
+    st = readState();
+    const r = cv.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.max(1, r.width), H = Math.max(1, r.height);
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+      cv.width = Math.round(W * dpr);
+      cv.height = Math.round(H * dpr);
+      trans = null;
+    }
+    const fit = st.mov === "parado" || st.mov === "subir";
+    L = layout(st, W, H, fit);
+    L.dpr = dpr;
+    for (const line of L.lines) line.dpr = dpr;
+    cv.setAttribute("aria-label", "Letreiro: " + ([st.text, st.text2].filter((s) => s.trim()).join(" / ") || "vazio"));
+    $("espaco-out").textContent = st.spacing + "%";
+    $("velocidade-out").textContent = st.speed;
+    for (const id of ["cor-texto2", "cor-efeito2", "pintura2"]) $(id).disabled = !st.own2;
+    $("intervalo-out").textContent = st.interval + " s";
+    $("duracao-out").textContent = (+$("duracao").value).toLocaleString("pt-BR", { minimumFractionDigits: 1 }) + " s";
+    const btn = $("btn-auto");
+    btn.innerHTML = `<kbd>F6</kbd> Automático: ${st.auto ? "ligado" : "desligado"}`;
+    btn.classList.toggle("on", st.auto);
+    updateAutoStatus();
+    save();
+  }
+
+  function updateAutoStatus() {
+    $("auto-status").textContent = !st.auto
+      ? "Desligado. Aperte F6 para o letreiro trocar de visual sozinho."
+      : paused
+        ? "Pausado. Aperte Espaço para continuar."
+        : `Ligado. Próxima troca em ${Math.max(1, Math.ceil(st.interval - autoTimer))} s.` +
+          (lastTransition ? ` Última transição: ${TRANSITIONS[lastTransition]}.` : "");
+  }
+
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    if (!paused) clock += dt;
+    if (!L) relayout();
+    if (!paused && st.auto) {
+      autoTimer += dt;
+      if (autoTimer >= st.interval) randomize(st.scope, true);
+    }
+    if (!paused && !switching && st.shuffle !== "off" && (st.mix !== "iguais" || st.letters === "mistura")) {
+      shuffleTimer += dt;
+      if (shuffleTimer >= (st.shuffle === "rapido" ? 1 : 3)) {
+        shuffleTimer = 0;
+        mixSeed++;
+        relayout();
+      }
+    }
+    statusTick += dt;
+    if (statusTick > 0.25) { statusTick = 0; updateAutoStatus(); }
+    const { W, H, dpr } = L;
+    const t = clock;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    drawScene(ctx, L, st, t);
+    if (st.style === "led" && L.cell) drawLedGrid(ctx, L, st);
+
+    const v = H * 0.18 * st.speed;
+    let x0 = (W - L.textW) / 2, yOff = 0;
+    if (!paused) { pos += v * dt; phase += dt * (0.3 + st.speed * 0.12); }
+    if (st.mov === "rolar" || st.mov === "rolar-dir") {
+      const span = W + L.textW;
+      const p = pos % span;
+      x0 = st.mov === "rolar" ? W - p : p - L.textW;
+    } else if (st.mov === "ioio") {
+      const inner = L.B + H * 0.07;
+      x0 = inner + (W - 2 * inner - L.textW) * (0.5 - 0.5 * Math.cos(phase * 2));
+    } else if (st.mov === "subir") {
+      yOff = H - ((pos * 0.5) % (2 * H));
+      if (st.style === "led" && L.cell) yOff = Math.round(yOff / L.cell) * L.cell;
+    }
+
+    const inner = L.B + H * 0.02;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(inner, inner, W - 2 * inner, H - 2 * inner);
+    ctx.clip();
+    ctx.translate(0, yOff);
+    for (const line of L.lines) drawText(ctx, line, line.gOff ? line2State(st) : st, x0 + line.dx, t);
+    ctx.restore();
+    drawBorder(ctx, L, st, t);
+    if (trans) {
+      trans.t += dt;
+      const p = Math.min(1, trans.t / trans.dur);
+      if (p >= 1) trans = null;
+      else drawTransition(ctx, trans, p);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- fonts ----------
+  // Each font is requested once. Only the fonts on screen are waited for; the rest download
+  // quietly in the background when the automatic mode or mixed letters may need them.
+  const FONT_SAMPLE = "AÁÂÃÀÇÉÊÍÓÔÕÚÜaáâãàçéêíóôõúü0123456789!?.,:-";
+  const fontLoads = new Map();
+  function loadFont(id) {
+    if (!fontLoads.has(id)) {
+      const p = document.fonts ? document.fonts.load(fontSpec(id, REF), FONT_SAMPLE).catch(() => []) : Promise.resolve([]);
+      fontLoads.set(id, p);
+    }
+    return fontLoads.get(id);
+  }
+  const loadFontsFor = (s) => Promise.all((mixFonts(s) ? FONTS.map((f) => f.id) : [s.font]).map(loadFont));
+  let preloading = false;
+  async function preloadFonts() {
+    if (preloading) return;
+    preloading = true;
+    for (let i = 0; i < FONTS.length; i += 6) await Promise.all(FONTS.slice(i, i + 6).map((f) => loadFont(f.id)));
+  }
+
+  // Redraws right away (typing must feel instant), then again once the fonts in use have arrived.
+  function refreshText() {
+    maskCacheMap.clear();
+    relayout();
+    loadFontsFor(readState()).then(queueRelayout);
+  }
+
+  let relayoutQueued = false, switching = false;
+  function queueRelayout() {
+    if (relayoutQueued || switching) return;
+    relayoutQueued = true;
+    requestAnimationFrame(() => { relayoutQueued = false; maskCacheMap.clear(); relayout(); });
+  }
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", queueRelayout);
+
+  // Applies a new look: change the controls, wait for its fonts, then blend from the old picture.
+  async function switchLook(change, after) {
+    switching = true;
+    change();
+    try { await loadFontsFor(readState()); } catch (e) {}
+    startTransition();
+    if (after) after();
+    switching = false;
+    maskCacheMap.clear();
+    relayout();
+  }
+
+  function toast(msg) {
+    $("toast").textContent = msg;
+    clearTimeout(toast.t);
+    toast.t = setTimeout(() => ($("toast").textContent = ""), 4000);
+  }
+
+  function setPaused(p) {
+    paused = p;
+    $("btn-pause").innerHTML = `<kbd>Espaço</kbd> ${paused ? "Continuar" : "Pausar"}`;
+  }
+
+  // Real fullscreen when the browser allows it; otherwise the sign fills the page, and from then on
+  // F11 is left to the browser so it can make the whole page fullscreen.
+  let fullscreenBlocked = false;
+  async function toggleFullscreen() {
+    const scr = $("screen");
+    if (scr.classList.contains("pseudo-full")) { scr.classList.remove("pseudo-full"); return; }
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await scr.requestFullscreen();
+    } catch (e) {
+      fullscreenBlocked = true;
+      scr.classList.add("pseudo-full");
+      wakeCursor();
+      toast("O letreiro foi ampliado na página. Aperte F11 para a tela cheia do navegador. Esc volta.");
+    }
+  }
+
+  // Hides the mouse pointer over the sign after a moment without movement.
+  let idleTimer = 0;
+  function wakeCursor() {
+    $("screen").classList.remove("idle");
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => $("screen").classList.add("idle"), 2500);
+  }
+
+  // Keeps the screen from sleeping while the sign is showing (ignored where not allowed).
+  let wakeLock = null;
+  async function keepAwake() {
+    if (wakeLock || !("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    } catch (e) {}
+  }
+
+  const pick = (sel) => { const o = $(sel).options; return o[Math.floor(Math.random() * o.length)].value; };
+  function hslHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = (n) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
+    return "#" + [f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, "0")).join("");
+  }
+  const chance = (p) => Math.random() < p;
+
+  // Rules that keep random looks readable.
+  const BOLD_GROUPS = new Set(["Impacto", "Infantis", "Futuristas"]);
+  const THIN_FONTS = new Set([
+    "Poiret One", "Italiana", "Aboreto", "Codystar", "Monofett", "Monoton", "Bungee Outline", "Tilt Prism",
+    "Vast Shadow", "Major Mono Display", "Rubik Maze", "Rubik Microbe", "Ribeye Marrow", "Zen Tokyo Zoo",
+    "Train One", "Rampart One", "Neonderthaw", "Sacramento", "Pinyon Script", "Homemade Apple", "Fredericka the Great",
+  ]);
+  // Effects drawn with lines or dots need solid, chunky letters.
+  const LINE_STYLES = new Set(["vazado", "formigas", "rabisco", "lampadas", "neon-tubo", "vidro", "pontos", "blocos", "led"]);
+  // Light backgrounds need an effect with a dark edge around the letters.
+  const BRIGHT_SCENES = new Set(["nuvens", "arcoiris-ceu"]);
+  const EDGED_STYLES = ["contorno", "duplo", "contorno-triplo", "adesivo", "quadrinhos", "3d", "sombra-longa"];
+  const randOf = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  function pickFontFor(style) {
+    const pool = FONTS.filter((f) => (LINE_STYLES.has(style) ? BOLD_GROUPS.has(f.group) : !THIN_FONTS.has(f.id)));
+    return randOf(pool).id;
+  }
+
+  // Draws a new random look. scope: "tudo" | "animacoes" | "letras".
+  function randomize(scope, fromAuto) {
+    autoTimer = 0; shuffleTimer = 0;
+    switchLook(() => pickRandomLook(scope), () => {
+      mixSeed = 1 + Math.floor(Math.random() * 99999);
+      clock = 0;
+    });
+    if (!fromAuto) toast("Combinação sorteada! Aperte F5 de novo para outra.");
+  }
+
+  function pickRandomLook(scope) {
+    if (scope !== "animacoes") {
+      for (const id of ["estilo", "pintura"]) $(id).value = pick(id);
+      $("fonte").value = pickFontFor($("estilo").value);
+      $("mistura").value = chance(0.4) || LINE_STYLES.has($("estilo").value) ? "iguais" : pick("mistura");
+      const h = Math.random() * 360;
+      $("cor-texto").value = hslHex(h, 90, 55 + Math.random() * 20);
+      $("cor-efeito").value = hslHex((h + 140 + Math.random() * 80) % 360, 85, 40 + Math.random() * 15);
+      $("cores2").value = chance(0.5) ? "propria" : "igual";
+      const h2 = (h + 90 + Math.random() * 180) % 360;
+      $("cor-texto2").value = hslHex(h2, 90, 62);
+      $("cor-efeito2").value = hslHex((h2 + 160) % 360, 80, 40);
+      $("pintura2").value = chance(0.6) ? "solida" : pick("pintura2");
+    }
+    if (scope !== "letras") {
+      $("letras").value = pick("letras");
+      $("movimento").value = chance(0.45) ? "parado" : pick("movimento");
+      $("fundo").value = pick("fundo");
+      $("borda").value = chance(0.4) ? "nenhuma" : pick("borda");
+      $("cor-fundo").value = hslHex(Math.random() * 360, 60, 4 + Math.random() * 12);
+    }
+    // Light backgrounds: give the letters a dark edge, or pick another background.
+    if (BRIGHT_SCENES.has($("fundo").value)) {
+      if (scope === "animacoes") {
+        if (!EDGED_STYLES.includes($("estilo").value)) {
+          const dark = [...$("fundo").options].map((o) => o.value).filter((v) => !BRIGHT_SCENES.has(v));
+          $("fundo").value = randOf(dark);
+        }
+      } else {
+        $("estilo").value = randOf(EDGED_STYLES);
+        $("cor-efeito").value = hslHex(Math.random() * 360, 70, 16);
+        $("cor-efeito2").value = hslHex(Math.random() * 360, 70, 16);
+      }
+    }
+    $("modelo").value = "";
+  }
+  const surprise = () => randomize("tudo", false);
+
+  function setAuto(on) {
+    $("auto").value = on ? "on" : "off";
+    autoTimer = 0;
+    if (on) preloadFonts();
+    relayout();
+    toast(on ? "Piloto automático ligado: o letreiro vai trocar de visual sozinho." : "Piloto automático desligado.");
+  }
+
+  $("modelo").addEventListener("change", () => {
+    const p = PRESETS[$("modelo").value];
+    if (!p) return;
+    switchLook(() => {
+      $("mistura").value = "iguais";
+      $("texto2").value = "";
+      $("tamanho2").value = "0.65";
+      $("cores2").value = "igual";
+      $("pintura2").value = "igual";
+      applyValues(p);
+      if ($("auto").value === "on") {
+        $("auto").value = "off";
+        toast("Piloto automático desligado para mostrar o modelo. Aperte F6 para religar.");
+      }
+    }, () => { pos = 0; clock = 0; });
+  });
+
+  for (const id of IDS) {
+    $(id).addEventListener("input", () => {
+      const isText = id === "texto" || id === "texto2";
+      if (!isText) $("modelo").value = "";
+      if (id === "letras") clock = 0;
+      if (id === "mistura" && $("mistura").value !== "iguais") preloadFonts();
+      if (id === "fonte" || id === "mistura" || isText) refreshText(); else relayout();
+    });
+  }
+  for (const id of AUTO_IDS) {
+    $(id).addEventListener("input", () => {
+      autoTimer = 0; shuffleTimer = 0;
+      if (id === "auto" && $("auto").value === "on") preloadFonts();
+      relayout();
+    });
+  }
+  $("btn-auto").addEventListener("click", () => setAuto($("auto").value !== "on"));
+  $("btn-now").addEventListener("click", () => randomize($("sortear").value, true));
+  $("btn-full").addEventListener("click", toggleFullscreen);
+  $("btn-pause").addEventListener("click", () => setPaused(!paused));
+  $("btn-random").addEventListener("click", surprise);
+  $("screen").addEventListener("dblclick", toggleFullscreen);
+  $("screen").addEventListener("pointermove", wakeCursor);
+  document.addEventListener("fullscreenchange", () => { wakeCursor(); queueRelayout(); });
+  if (window.ResizeObserver) new ResizeObserver(queueRelayout).observe(cv);
+  else window.addEventListener("resize", queueRelayout);
+  document.addEventListener("visibilitychange", keepAwake);
+  window.addEventListener("pointerdown", keepAwake);
+  window.addEventListener("keydown", (e) => {
+    // Keys typed into a field, or pressed on a focused button, keep their normal meaning.
+    const inControl = e.target.closest && e.target.closest("input, select, textarea, button");
+    if (e.key === "F11") {
+      if (fullscreenBlocked) return; // let the browser make the whole page fullscreen
+      e.preventDefault(); toggleFullscreen();
+    }
+    else if (e.key === "Escape" && $("screen").classList.contains("pseudo-full")) toggleFullscreen();
+    else if (e.key === "F5") { e.preventDefault(); surprise(); }
+    else if (e.key === "F6") { e.preventDefault(); setAuto($("auto").value !== "on"); }
+    else if (e.key === " " && !inControl) { e.preventDefault(); setPaused(!paused); }
+  });
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches && !hasSaved) {
+    $("movimento").value = "parado";
+    $("letras").value = "nenhuma";
+    $("auto").value = "off";
+  }
+
+  relayout();
+  requestAnimationFrame(frame);
+  keepAwake();
+  loadFontsFor(readState()).then(() => {
+    queueRelayout();
+    const s = readState();
+    if (s.auto || mixFonts(s)) preloadFonts();
+  });
+})();
+</script>
+<script>
+  // Works offline once installed (only when served over http/https, not from disk).
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+</script>
+</body>
+</html>
