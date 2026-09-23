@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="fonts/fonts.css">
+<script src="fonts/fonts.js"></script>
 <style>
   html, body { margin: 0; }
   :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -155,6 +155,44 @@
   .screen.idle:is(:fullscreen, .pseudo-full) { cursor: none; }
   .screen.idle .hint { opacity: 0; }
 
+  /* Player: only the sign, running, with no controls. */
+  body.player { overflow: hidden; }
+  body.player .titlebar, body.player .statusbar, body.player .hint,
+  body.player main > :not(:has(.screen)) { display: none; }
+  .player-tip {
+    position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.65); color: var(--white);
+    padding: 6px 16px; font-size: 22px; white-space: nowrap;
+    pointer-events: none; transition: opacity .8s;
+  }
+  body:not(.player) .player-tip, .player-tip.gone { opacity: 0; }
+  .player-exit {
+    position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center;
+    background: var(--blue); border: 4px double var(--white); padding: 10px 16px;
+    max-width: calc(100% - 32px); cursor: default;
+  }
+  .player-exit button { font-size: 21px; padding: 4px 16px; box-shadow: 5px 5px 0 var(--black); }
+
+  /* Saved signs */
+  .save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 18px; align-items: end; }
+  .save-row button { font-size: 22px; padding: 6px 22px; }
+  .note { color: var(--cyan); margin: 12px 0 0; }
+  .note b { color: var(--white); font-weight: normal; }
+  .saved-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 14px; }
+  .saved-list li {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between;
+    border-top: 1px dashed var(--grey); padding-top: 14px;
+  }
+  .saved-info { display: grid; gap: 2px; min-width: 0; }
+  .saved-name { color: var(--yellow); font-size: 24px; overflow-wrap: anywhere; }
+  .saved-meta { color: var(--grey); font-size: 18px; overflow-wrap: anywhere; }
+  .saved-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .saved-actions button { font-size: 19px; padding: 3px 12px; box-shadow: 4px 4px 0 var(--black); }
+  .saved-actions button.danger { background: var(--red); color: var(--white); }
+  .saved-link { flex-basis: 100%; font-size: 16px; }
+  .saved-empty { color: var(--grey); border: 0 !important; }
+
   .actions { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
   button {
     font: inherit;
@@ -184,7 +222,7 @@
 
 <header class="titlebar">
   <span><b>DIVULGADOR.EXE</b> · letreiro de tela</span>
-  <span>v4.0 · 2026</span>
+  <span>v4.1 · 2026</span>
 </header>
 
 <main>
@@ -280,6 +318,12 @@
     <div class="screen" id="screen">
       <canvas id="display" aria-label="Letreiro"></canvas>
       <span class="hint">Esc para sair da tela cheia</span>
+      <div class="player-tip" id="player-tip" aria-hidden="true"></div>
+      <div class="player-exit" id="player-exit" hidden>
+        <span>Sair da exibição?</span>
+        <button class="primary" id="btn-sair" type="button">Voltar ao editor</button>
+        <button id="btn-ficar" type="button">Continuar</button>
+      </div>
     </div>
   </section>
 
@@ -288,8 +332,21 @@
     <button id="btn-pause" type="button"><kbd>Espaço</kbd> Pausar</button>
     <button id="btn-random" type="button"><kbd>F5</kbd> Surpresa</button>
     <button id="btn-auto" type="button"><kbd>F6</kbd> Automático</button>
+    <button id="btn-salvar" type="button">Salvar letreiro</button>
   </div>
   <p class="toast" id="toast" role="status"></p>
+
+  <section class="win" id="salvos-win">
+    <h2>[ Meus letreiros ]</h2>
+    <form class="save-row" id="form-salvar">
+      <label>Nome do letreiro
+        <input id="nome-salvo" type="text" maxlength="60" autocomplete="off" placeholder="ex.: Aniversário da Alice">
+      </label>
+      <button class="primary" type="submit">Salvar</button>
+    </form>
+    <p class="note">Cada letreiro salvo abre <b>só rodando</b>, sem os controles, para ninguém mudar nada.</p>
+    <ul class="saved-list" id="lista-salvos"></ul>
+  </section>
 
   <div class="cols">
     <section class="win">
@@ -629,6 +686,15 @@
 
 <script>
 (() => {
+  // The page as it was delivered, before this script changes anything: the base for saved-sign files.
+  // The app's big block of embedded fonts is left out; each file gets only the fonts it uses.
+  const SOURCE_HTML = (() => {
+    const root = document.documentElement.cloneNode(true);
+    const fonts = root.querySelector("#divulgador-fonts");
+    if (fonts) fonts.remove();
+    return "<!doctype html>\n" + root.outerHTML;
+  })();
+
   const F = (id, group, fallback = "Impact, sans-serif", w = 400) => ({ id, group, w, css: `"${id}", ${fallback}` });
   const FONTS = [
     F("Anton", "Impacto"),
@@ -893,7 +959,10 @@
     const saved = JSON.parse(localStorage.getItem(STORE) || "null");
     if (saved) { applyValues(saved); hasSaved = true; }
   } catch (e) {}
+  // While a saved sign is showing ({ canExit, editorValues }), the editor's own settings are left alone.
+  let player = null;
   function save() {
+    if (player) return;
     try {
       const o = {};
       for (const id of IDS.concat(AUTO_IDS)) o[id] = $(id).value;
@@ -3784,12 +3853,14 @@
   let fullscreenBlocked = false;
   async function toggleFullscreen() {
     const scr = $("screen");
-    if (scr.classList.contains("pseudo-full")) { scr.classList.remove("pseudo-full"); return; }
+    // In the player the sign always fills the page; only real fullscreen is toggled.
+    if (scr.classList.contains("pseudo-full") && !player) { scr.classList.remove("pseudo-full"); return; }
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await scr.requestFullscreen();
     } catch (e) {
       fullscreenBlocked = true;
+      if (player) return;
       scr.classList.add("pseudo-full");
       wakeCursor();
       toast("O letreiro foi ampliado na página. Aperte F11 para a tela cheia do navegador. Esc volta.");
@@ -3898,6 +3969,261 @@
     toast(on ? "Piloto automático ligado: o letreiro vai trocar de visual sozinho." : "Piloto automático desligado.");
   }
 
+  // ---------- saved signs and the player ----------
+  // A saved sign is a snapshot of every setting. Shown in the player, it runs with no controls,
+  // so nobody watching can change it. It can open here, from a link, or from a downloaded file.
+  const PUBLIC_URL = "https://srleandrosantarita-star.github.io/divulgador/";
+  const SAVED_KEY = "divulgador-salvos";
+  const inFrame = (() => { try { return window.top !== window; } catch (e) { return true; } })();
+  const canShare = !inFrame; // links and files need a real browser tab (not an embedded preview)
+
+  function snapshotValues() {
+    const o = {};
+    for (const id of IDS.concat(AUTO_IDS)) o[id] = $(id).value;
+    o.seed = mixSeed;
+    return o;
+  }
+  function encodeSign(v) {
+    let bin = "";
+    new TextEncoder().encode(JSON.stringify(v)).forEach((b) => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function decodeSign(s) {
+    const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+  }
+  // Links always point at a web address, so they also open on other phones and TVs.
+  function signLink(v) {
+    const base = location.protocol.startsWith("http") ? location.origin + location.pathname : PUBLIC_URL;
+    return base + "#exibir=" + encodeSign(v);
+  }
+
+  function loadSaved() {
+    try { return JSON.parse(localStorage.getItem(SAVED_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function storeSaved(list) {
+    try { localStorage.setItem(SAVED_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+  }
+
+  function renderSaved() {
+    const ul = $("lista-salvos");
+    ul.textContent = "";
+    const list = loadSaved();
+    if (!list.length) {
+      const li = document.createElement("li");
+      li.className = "saved-empty";
+      li.textContent = "Nenhum letreiro salvo ainda. Monte o seu, dê um nome e toque em Salvar.";
+      ul.appendChild(li);
+      return;
+    }
+    list.forEach((entry) => {
+      const li = document.createElement("li");
+      const info = document.createElement("div");
+      info.className = "saved-info";
+      const name = document.createElement("span");
+      name.className = "saved-name";
+      name.textContent = entry.name;
+      const meta = document.createElement("span");
+      meta.className = "saved-meta";
+      const lines = [entry.values.texto, entry.values.texto2].filter((s) => s && s.trim()).join(" / ");
+      meta.textContent = `${lines || "(sem texto)"} · salvo em ${new Date(entry.date).toLocaleDateString("pt-BR")}`;
+      info.append(name, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "saved-actions";
+      const btn = (label, fn, cls) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        if (cls) b.className = cls;
+        b.addEventListener("click", () => fn(b));
+        actions.appendChild(b);
+        return b;
+      };
+      btn("▶ Exibir", () => enterPlayer(entry.values, true), "primary");
+      if (canShare) {
+        btn("🔗 Link", () => shareSign(entry, li));
+        btn("⬇ Arquivo", () => downloadSign(entry));
+      }
+      btn("✎ Editar", () => loadIntoEditor(entry));
+      btn("Apagar", (b) => {
+        if (b.dataset.armed) { deleteSaved(entry.id); return; }
+        b.dataset.armed = "1";
+        b.textContent = "Confirmar?";
+        b.classList.add("danger");
+        setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = "Apagar"; b.classList.remove("danger"); } }, 3000);
+      });
+      li.append(info, actions);
+      ul.appendChild(li);
+    });
+  }
+
+  function saveCurrent(name) {
+    const list = loadSaved();
+    const clean = (name || $("texto").value || "Letreiro").trim().slice(0, 60);
+    const existing = list.find((e) => e.name.toLowerCase() === clean.toLowerCase());
+    const entry = { id: existing ? existing.id : Date.now().toString(36), name: clean, date: Date.now(), values: snapshotValues() };
+    const next = [entry, ...list.filter((e) => e !== existing)];
+    if (!storeSaved(next)) { toast("Não foi possível salvar neste aparelho (armazenamento bloqueado ou cheio)."); return; }
+    renderSaved();
+    $("nome-salvo").value = "";
+    toast(existing ? `"${clean}" foi atualizado.` : `"${clean}" foi salvo! Toque em Exibir para mostrar só o letreiro rodando.`);
+  }
+
+  function deleteSaved(id) {
+    storeSaved(loadSaved().filter((e) => e.id !== id));
+    renderSaved();
+    toast("Letreiro apagado.");
+  }
+
+  function loadIntoEditor(entry) {
+    switchLook(() => { applyValues(entry.values); $("modelo").value = ""; }, () => {
+      if (entry.values.seed) mixSeed = entry.values.seed;
+      pos = 0; clock = 0;
+    });
+    $("nome-salvo").value = entry.name;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast(`"${entry.name}" está no editor. Mude o que quiser e salve com o mesmo nome para atualizar.`);
+  }
+
+  async function shareSign(entry, li) {
+    const url = signLink(entry.values);
+    if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      try { await navigator.share({ title: entry.name, url }); return; }
+      catch (e) { if (e.name === "AbortError") return; }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Link copiado! Cole numa mensagem ou abra no navegador de outro aparelho.");
+    } catch (e) {
+      let field = li.querySelector(".saved-link");
+      if (!field) {
+        field = document.createElement("input");
+        field.className = "saved-link";
+        field.readOnly = true;
+        field.setAttribute("aria-label", "Link do letreiro");
+        li.appendChild(field);
+      }
+      field.value = url;
+      field.focus();
+      field.select();
+      toast("Copie o link selecionado abaixo do letreiro.");
+    }
+  }
+
+  // Fonts for a downloaded file: the ones it uses, copied in so it also works offline.
+  async function fontCssFor(families) {
+    const want = new Set(families);
+    const pickFaces = (blocks) => blocks.filter((b) => { const m = b.match(/font-family:\s*["']([^"']+)["']/); return m && want.has(m[1]); });
+    if (window.DIVULGADOR_FONT_CSS) {
+      const faces = pickFaces(window.DIVULGADOR_FONT_CSS.match(/@font-face\s*\{[^}]*\}/g) || []);
+      if (faces.length) return `<style>\n${faces.join("\n")}\n</style>`;
+    }
+    try {
+      const res = await fetch("fonts/fonts.css");
+      if (res.ok) {
+        const faces = pickFaces((await res.text()).match(/@font-face\s*\{[^}]*\}/g) || []);
+        if (faces.length) return `<style>\n${faces.join("\n")}\n</style>`;
+      }
+    } catch (e) {}
+    try {
+      for (const sheet of document.styleSheets) {
+        const faces = pickFaces([...sheet.cssRules].filter((r) => r instanceof CSSFontFaceRule).map((r) => r.cssText));
+        if (faces.length) return `<style>\n${faces.join("\n")}\n</style>`;
+      }
+    } catch (e) {}
+    // Last resort: load them from Google Fonts when the file is opened (needs internet).
+    const q = families.filter((f) => f !== "Arial Black").map((f) => {
+      const def = FONTS.find((x) => x.id === f);
+      return "family=" + encodeURIComponent(f).replace(/%20/g, "+") + (def && def.w !== 400 ? `:wght@${def.w}` : "");
+    }).join("&");
+    return ``;
+  }
+
+  async function downloadSign(entry) {
+    const v = entry.values;
+    const families = v.mistura === "fontes" || v.mistura === "tudo" ? FONTS.map((f) => f.id) : [v.fonte];
+    const fonts = await fontCssFor(families);
+    const safeTitle = entry.name.replace(/[<>&"]/g, "");
+    const baked = `<script>window.DIVULGADOR_PLAYER = ${JSON.stringify(v).replace(/</g, "\\u003c")};<\/script>`;
+    let html = SOURCE_HTML
+      .replace(/<script src="fonts\/fonts\.js"><\/script>/, "")
+      .replace(/<link[^>]+fonts\.googleapis\.com\/css2[^>]*>/g, "")
+      .replace(/<link rel="manifest"[^>]*>/, "")
+      .replace(/<title>[^<]*<\/title>/, `<title>${safeTitle}</title>`);
+    html = html.includes("</head>") ? html.replace("</head>", `${fonts}\n${baked}\n</head>`) : baked + fonts + html;
+    const blob = new Blob([html], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `Letreiro - ${entry.name.replace(/[\\/:*?"<>|]+/g, "").trim() || "Divulgador"}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    toast(fonts.startsWith("<link")
+      ? "Arquivo salvo em Downloads. Ele abre rodando; as letras especiais precisam de internet."
+      : "Arquivo salvo em Downloads. É só abrir que ele já começa rodando, mesmo sem internet.");
+  }
+
+  function showPlayerTip() {
+    const tip = $("player-tip");
+    tip.textContent = player.canExit ? "Toque para tela cheia · segure para sair" : "Toque para tela cheia";
+    tip.classList.remove("gone");
+    clearTimeout(tip.timer);
+    tip.timer = setTimeout(() => tip.classList.add("gone"), 4000);
+  }
+
+  function enterPlayer(values, canExit) {
+    player = { canExit, editorValues: canExit ? snapshotValues() : null };
+    $("player-exit").hidden = true;
+    switchLook(() => { applyValues(values); $("modelo").value = ""; }, () => {
+      if (values.seed) mixSeed = values.seed;
+      pos = 0; clock = 0; autoTimer = 0;
+      window.scrollTo(0, 0);
+      document.body.classList.add("player");
+      $("screen").classList.add("pseudo-full");
+    });
+    showPlayerTip();
+    wakeCursor();
+    keepAwake();
+    const s = readState();
+    if (s.auto || mixFonts(s)) preloadFonts();
+  }
+
+  function exitPlayer() {
+    if (!player || !player.canExit) return;
+    const back = player.editorValues;
+    player = null;
+    $("player-exit").hidden = true;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    document.body.classList.remove("player");
+    $("screen").classList.remove("pseudo-full");
+    switchLook(() => applyValues(back), () => { if (back.seed) mixSeed = back.seed; });
+  }
+
+  // Holding a finger (or the mouse button) on the sign for a moment offers the way out.
+  let holdTimer = 0;
+  $("screen").addEventListener("pointerdown", (e) => {
+    if (!player || !player.canExit || e.target.closest(".player-exit")) return;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => { $("player-exit").hidden = false; }, 1200);
+  });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) $("screen").addEventListener(ev, () => clearTimeout(holdTimer));
+  $("screen").addEventListener("click", (e) => {
+    if (player && !e.target.closest(".player-exit") && !document.fullscreenElement && !fullscreenBlocked) toggleFullscreen();
+  });
+  $("btn-sair").addEventListener("click", exitPlayer);
+  $("btn-ficar").addEventListener("click", () => { $("player-exit").hidden = true; });
+
+  $("form-salvar").addEventListener("submit", (e) => { e.preventDefault(); saveCurrent($("nome-salvo").value); });
+  $("btn-salvar").addEventListener("click", () => {
+    if (!$("nome-salvo").value.trim()) $("nome-salvo").value = $("texto").value.trim().slice(0, 60);
+    $("salvos-win").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("nome-salvo").focus();
+    $("nome-salvo").select();
+  });
+  renderSaved();
+
   $("modelo").addEventListener("change", () => {
     const p = PRESETS[$("modelo").value];
     if (!p) return;
@@ -3936,7 +4262,7 @@
   $("btn-full").addEventListener("click", toggleFullscreen);
   $("btn-pause").addEventListener("click", () => setPaused(!paused));
   $("btn-random").addEventListener("click", surprise);
-  $("screen").addEventListener("dblclick", toggleFullscreen);
+  $("screen").addEventListener("dblclick", () => { if (!player) toggleFullscreen(); });
   $("screen").addEventListener("pointermove", wakeCursor);
   document.addEventListener("fullscreenchange", () => { wakeCursor(); queueRelayout(); });
   if (window.ResizeObserver) new ResizeObserver(queueRelayout).observe(cv);
@@ -3944,6 +4270,13 @@
   document.addEventListener("visibilitychange", keepAwake);
   window.addEventListener("pointerdown", keepAwake);
   window.addEventListener("keydown", (e) => {
+    // The player only answers to fullscreen and, when allowed, the way out.
+    if (player) {
+      if (e.key === "F11" && !fullscreenBlocked) { e.preventDefault(); toggleFullscreen(); }
+      else if (e.key === "Escape" && player.canExit) $("player-exit").hidden = false;
+      else if (["F5", "F6", " "].includes(e.key)) e.preventDefault();
+      return;
+    }
     // Keys typed into a field, or pressed on a focused button, keep their normal meaning.
     const inControl = e.target.closest && e.target.closest("input, select, textarea, button");
     if (e.key === "F11") {
@@ -3960,6 +4293,13 @@
     $("movimento").value = "parado";
     $("letras").value = "nenhuma";
     $("auto").value = "off";
+  }
+
+  // A sign opened from a link (#exibir=...) or from a downloaded file starts straight in the player.
+  const linkMatch = location.hash.match(/^#exibir=([\w-]+)/);
+  if (window.DIVULGADOR_PLAYER || linkMatch) {
+    try { enterPlayer(window.DIVULGADOR_PLAYER || decodeSign(linkMatch[1]), false); }
+    catch (e) { toast("Este link de letreiro está incompleto. Peça para enviarem de novo."); }
   }
 
   relayout();

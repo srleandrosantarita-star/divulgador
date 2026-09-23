@@ -11,6 +11,14 @@ Letreiro animado para festas e eventos, no estilo dos antigos programas de banne
 
 Depois de aberto uma vez, funciona sem internet: as fontes vêm junto com o aplicativo.
 
+## Letreiros salvos
+
+Monte o letreiro, toque em **Salvar letreiro** e dê um nome. Em **Meus letreiros** ele pode ser:
+
+- **Exibido** só rodando, na tela toda, sem controles (segure o dedo no letreiro para voltar ao editor);
+- enviado por **link**, que abre o letreiro rodando em qualquer aparelho, sem opção de mudar nada;
+- baixado como **arquivo** que já abre rodando, mesmo sem internet.
+
 ## O que tem
 
 - 162 fontes, 38 efeitos de letra, duas linhas de texto com cores próprias
