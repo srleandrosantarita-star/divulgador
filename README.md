@@ -17,12 +17,13 @@ Monte o letreiro, toque em **Salvar letreiro** e dê um nome. Em **Meus letreiro
 
 - **Exibido** só rodando, na tela toda, sem controles (segure o dedo no letreiro para voltar ao editor);
 - enviado por **link**, que abre o letreiro rodando em qualquer aparelho, sem opção de mudar nada;
-- baixado como **arquivo** que já abre rodando, mesmo sem internet.
+- baixado como **arquivo** que já abre rodando, com a música, mesmo sem internet.
 
 ## Música
 
 Toque em **♫ Música** e em **+ Adicionar música** para escolher uma música do aparelho. Ela fica guardada só nele,
 toca em repetição enquanto o letreiro roda e começa sozinha ao exibir um letreiro salvo.
+O arquivo baixado de um letreiro leva a música junto: ao abrir, toque na tela para ela começar.
 
 ## O que tem
 

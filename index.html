@@ -4250,9 +4250,12 @@
   async function downloadSign(entry) {
     const v = entry.values;
     const families = v.mistura === "fontes" || v.mistura === "tudo" ? FONTS.map((f) => f.id) : [v.fonte];
+    toast("Preparando o arquivo…");
     const fonts = await fontCssFor(families);
+    const music = await musicForFile().catch(() => null);
     const safeTitle = entry.name.replace(/[<>&"]/g, "");
-    const baked = `<script>window.DIVULGADOR_PLAYER = ${JSON.stringify(v).replace(/</g, "\\u003c")};<\/script>`;
+    const baked = `<script>window.DIVULGADOR_PLAYER = ${JSON.stringify(v).replace(/</g, "\\u003c")};<\/script>` +
+      (music ? `\n<script>window.DIVULGADOR_MUSIC = ${JSON.stringify(music).replace(/</g, "\\u003c")};<\/script>` : "");
     let html = SOURCE_HTML
       .replace(/<script src="fonts\/fonts\.js"><\/script>/, "")
       .replace(/<link[^>]+fonts\.googleapis\.com\/css2[^>]*>/g, "")
@@ -4267,17 +4270,22 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    toast(fonts.startsWith("<link")
-      ? "Arquivo salvo em Downloads. Ele abre rodando; as letras especiais precisam de internet."
-      : "Arquivo salvo em Downloads. É só abrir que ele já começa rodando, mesmo sem internet.");
+    const size = (blob.size / 1024 / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+    const offline = fonts.startsWith("<link") ? " As letras especiais precisam de internet." : "";
+    toast(music
+      ? `Arquivo salvo em Downloads com a música (${size} MB). Ao abrir, toque na tela para a música começar.${offline}`
+      : `Arquivo salvo em Downloads. É só abrir que ele já começa rodando.${offline || " Funciona sem internet."}`);
   }
 
   function showPlayerTip() {
     const tip = $("player-tip");
-    tip.textContent = player.canExit ? "Toque para tela cheia · segure para sair" : "Toque para tela cheia";
+    const waitsForTap = !player.canExit && bakedMusic;
+    tip.textContent = player.canExit ? "Toque para tela cheia · segure para sair"
+      : waitsForTap ? "Toque na tela para começar" : "Toque para tela cheia";
     tip.classList.remove("gone");
     clearTimeout(tip.timer);
-    tip.timer = setTimeout(() => tip.classList.add("gone"), 4000);
+    // A file that carries music keeps the hint up until the first tap starts the sound.
+    if (!waitsForTap) tip.timer = setTimeout(() => tip.classList.add("gone"), 4000);
   }
 
   function enterPlayer(values, canExit) {
@@ -4335,6 +4343,8 @@
   // ---------- music ----------
   // Songs picked from the device are kept in IndexedDB (only on this device) and play under the sign.
   const MUSIC_DB = "divulgador-musicas", MUSIC_STORE = "musicas", MUSIC_CFG = "divulgador-musica-config";
+  // A downloaded sign file may carry its songs inside it (see musicForFile); they are used instead of this device's list.
+  const bakedMusic = window.DIVULGADOR_MUSIC || null;
   const audio = new Audio();
   audio.preload = "auto";
   let tracks = [];             // { id, name, size, duration, blob, order }
@@ -4380,6 +4390,7 @@
     return c;
   }
   function saveMusicCfg() {
+    if (bakedMusic) return;
     try {
       localStorage.setItem(MUSIC_CFG, JSON.stringify({
         volume: +$("mus-volume").value, repetir: $("mus-repetir").value,
@@ -4637,15 +4648,68 @@
     on("previoustrack", prevTrack);
   }
 
-  const musicCfg = loadMusicCfg();
-  renderMusic();
-  dbAll().then((list) => {
-    tracks = list || [];
-    const saved = trackById(musicCfg.atual) || sortedTracks()[0];
-    if (saved) loadTrack(saved); else renderMusic();
-  }).catch(() => {
-    $("mus-info").textContent = "Este navegador não deixa guardar músicas.";
+  // ---------- music inside downloaded sign files ----------
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
   });
+  function dataUrlToBlob(url) {
+    const comma = url.indexOf(",");
+    const type = (url.slice(0, comma).match(/^data:([^;,]+)/) || [])[1] || "audio/mpeg";
+    const bin = atob(url.slice(comma + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type });
+  }
+
+  // The songs to put inside a sign file: the whole list, starting with the selected song.
+  // None when the list is empty or "Ao exibir um letreiro salvo" is set to not play.
+  async function musicForFile() {
+    if (!tracks.length || $("mus-exibir").value !== "tocar") return null;
+    const list = sortedTracks();
+    const start = Math.max(0, list.findIndex((t) => t.id === currentId));
+    const ordered = list.slice(start).concat(list.slice(0, start));
+    const out = [];
+    for (const t of ordered) out.push({ name: t.name, duration: t.duration, data: await blobToDataUrl(t.blob) });
+    return { volume: +$("mus-volume").value, repetir: $("mus-repetir").value, ordem: $("mus-ordem").value, tracks: out };
+  }
+
+  // Browsers only allow sound after the viewer touches the page, so a file's music starts on the first tap or key
+  // (or right away, where the browser allows it).
+  function startBakedMusic() {
+    const events = ["pointerdown", "keydown", "touchstart"];
+    const go = () => {
+      for (const ev of events) window.removeEventListener(ev, go, true);
+      $("player-tip").classList.add("gone");
+      if (audio.paused) audio.play().catch(() => {});
+    };
+    for (const ev of events) window.addEventListener(ev, go, true);
+    audio.play().catch(() => {});
+  }
+
+  if (bakedMusic) {
+    $("mus-volume").value = bakedMusic.volume != null ? bakedMusic.volume : 80;
+    $("mus-repetir").value = bakedMusic.repetir || "lista";
+    $("mus-ordem").value = bakedMusic.ordem || "normal";
+    audio.volume = +$("mus-volume").value / 100;
+    tracks = (bakedMusic.tracks || []).map((t, i) => ({
+      id: "arquivo-" + i, name: t.name, size: 0, duration: t.duration || 0, blob: dataUrlToBlob(t.data), order: i + 1,
+    }));
+    window.DIVULGADOR_MUSIC = null; // the songs now live in Blobs; drop the big text copy
+    if (tracks.length) { loadTrack(tracks[0]); startBakedMusic(); }
+  } else {
+    const musicCfg = loadMusicCfg();
+    renderMusic();
+    dbAll().then((list) => {
+      tracks = list || [];
+      const saved = trackById(musicCfg.atual) || sortedTracks()[0];
+      if (saved) loadTrack(saved); else renderMusic();
+    }).catch(() => {
+      $("mus-info").textContent = "Este navegador não deixa guardar músicas.";
+    });
+  }
 
   $("modelo").addEventListener("change", () => {
     const p = PRESETS[$("modelo").value];
