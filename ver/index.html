@@ -244,6 +244,29 @@
   button.bg-del.danger { background: var(--red); color: var(--white); }
   .bg-grid .bg-empty { grid-column: 1 / -1; color: var(--grey); border: 0; }
   #btn-fundos.on { background: var(--yellow); }
+
+  /* Video recording: the sign alone, in the chosen shape; the bar above it is not recorded. */
+  .rec-start { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 20px; }
+  .rec-start button { font-size: 24px; }
+  #rec-comecar { background: var(--red); color: var(--white); }
+  body.recording { overflow: hidden; background: var(--black); }
+  body.recording .titlebar, body.recording .statusbar, body.recording .hint,
+  body.recording main > :not(:has(.screen)) { display: none; }
+  .screen.recording-box { position: fixed; z-index: 50; padding: 0; margin: 0; }
+  .screen.recording-box canvas { width: 100%; height: 100%; }
+  .rec-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 16px;
+    padding: 8px 16px calc(8px) 16px; padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    background: var(--black); color: var(--white); font-size: 22px; min-height: 56px;
+  }
+  .rec-bar[hidden] { display: none; }
+  .rec-dot { color: #ff3b3b; animation: rec-blink 1s steps(2, start) infinite; }
+  @keyframes rec-blink { to { visibility: hidden; } }
+  @media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
+  .rec-progress { width: min(200px, 30vw); height: 10px; background: #333; display: inline-block; }
+  .rec-progress span { display: block; height: 100%; width: 0; background: #ff3b3b; }
+  .rec-bar button { font-size: 20px; padding: 3px 14px; box-shadow: 4px 4px 0 #222; }
   #btn-musica.on { background: var(--yellow); }
 
   .actions { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
@@ -387,6 +410,7 @@
     <button id="btn-salvar" type="button">Salvar letreiro</button>
     <button id="btn-musica" type="button"><kbd>M</kbd> ♫ Música</button>
     <button id="btn-fundos" type="button">🖼 Meus fundos</button>
+    <button id="btn-video" type="button">🎬 Gravar vídeo</button>
   </div>
   <p class="toast" id="toast" role="status"></p>
 
@@ -483,6 +507,37 @@
     </div>
     <ul class="bg-grid" id="bg-lista"></ul>
     <p class="note">Toque numa imagem para ela virar o fundo do letreiro. Ela fica guardada <b>só neste aparelho</b>. Escurecer ajuda as letras a aparecerem.</p>
+  </section>
+
+  <section class="win" id="video-win">
+    <h2>[ 🎬 Gravar vídeo ]</h2>
+    <div class="fields">
+      <label>Formato
+        <select id="rec-formato">
+          <option value="retrato">Em pé 9:16 (status e stories)</option>
+          <option value="paisagem">Deitado 16:9 (TV e YouTube)</option>
+          <option value="quadrado">Quadrado 1:1 (feed)</option>
+        </select>
+      </label>
+      <label>Duração
+        <select id="rec-duracao">
+          <option value="10">10 segundos</option>
+          <option value="15" selected>15 segundos</option>
+          <option value="30">30 segundos</option>
+          <option value="60">1 minuto</option>
+        </select>
+      </label>
+      <label>Música
+        <select id="rec-musica">
+          <option value="sim">Com a música</option>
+          <option value="nao">Sem música</option>
+        </select>
+      </label>
+    </div>
+    <div class="rec-start">
+      <button class="primary" id="rec-comecar" type="button">● Começar a gravar</button>
+    </div>
+    <p class="note" id="rec-nota">Grava o letreiro do jeito que está agora, com a música da lista, e salva o vídeo em <b>Downloads</b>, pronto para mandar no WhatsApp.</p>
   </section>
 
   <div class="cols">
@@ -813,6 +868,14 @@
   </section>
 </main>
 
+<div class="rec-bar" id="rec-bar" hidden>
+  <span class="rec-dot" aria-hidden="true">●</span>
+  <span>Gravando <span id="rec-tempo">0:00</span> de <span id="rec-total">0:15</span></span>
+  <span class="rec-progress"><span id="rec-progresso"></span></span>
+  <button class="primary" id="rec-parar" type="button">Parar e salvar</button>
+  <button id="rec-cancelar" type="button">Cancelar</button>
+</div>
+
 <footer class="statusbar">
   <span><kbd>F11</kbd> ou duplo clique: Tela cheia</span>
   <span><kbd>Espaço</kbd> Pausar</span>
@@ -1116,6 +1179,8 @@
   } catch (e) {}
   // While a saved sign is showing ({ canExit, editorValues }), the editor's own settings are left alone.
   let player = null;
+  // While a video is being recorded: { pxW, pxH, ... } — the canvas is drawn at exactly that size.
+  let recording = null;
   function save() {
     if (player) return;
     try {
@@ -3856,8 +3921,10 @@
   function relayout() {
     st = readState();
     const r = cv.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const W = Math.max(1, r.width), H = Math.max(1, r.height);
+    const W = Math.max(1, r.width);
+    // Recording draws at the video's own pixel size (exactly, e.g. 720×1280), whatever the size on screen.
+    const dpr = recording ? recording.pxW / W : window.devicePixelRatio || 1;
+    const H = recording ? recording.pxH / dpr : Math.max(1, r.height);
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
       cv.width = Math.round(W * dpr);
       cv.height = Math.round(H * dpr);
@@ -5035,6 +5102,159 @@
     }).catch(() => { $("bg-info").textContent = "Este navegador não deixa guardar fundos."; });
   }
 
+  // ---------- record a video ----------
+  // Records the sign's canvas (and the music, mixed in through Web Audio) with MediaRecorder.
+  const REC_SIZES = { retrato: [720, 1280], paisagem: [1280, 720], quadrado: [960, 960] };
+  const canRecord = canShare && typeof MediaRecorder !== "undefined" && !!cv.captureStream;
+  let audioCtx = null, audioRecDest = null;
+
+  // MP4 first (what WhatsApp accepts); WebM where the browser can only make that.
+  function pickVideoType() {
+    const types = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/mp4",
+      "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+    return types.find((t) => MediaRecorder.isTypeSupported(t)) || "";
+  }
+
+  // The music is routed through Web Audio once, so it can be heard and recorded at the same time.
+  function musicTrackForRecording() {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = audioCtx.createMediaElementSource(audio);
+        audioRecDest = audioCtx.createMediaStreamDestination();
+        src.connect(audioCtx.destination);
+        src.connect(audioRecDest);
+      }
+      audioCtx.resume().catch(() => {});
+      return audioRecDest.stream.getAudioTracks()[0] || null;
+    } catch (e) { return null; }
+  }
+
+  // Places the sign on screen in the video's shape, as large as fits under the recording bar.
+  function placeRecordingBox() {
+    if (!recording) return;
+    const bar = $("rec-bar").offsetHeight || 56;
+    const availW = innerWidth - 16, availH = innerHeight - bar - 16;
+    const fit = Math.min(availW / recording.pxW, availH / recording.pxH);
+    const w = Math.floor(recording.pxW * fit), h = Math.floor(recording.pxH * fit);
+    Object.assign($("screen").style, {
+      width: w + "px", height: h + "px",
+      left: Math.round((innerWidth - w) / 2) + "px",
+      top: Math.round(bar + (availH + 16 - h) / 2) + "px",
+    });
+  }
+
+  function startRecording() {
+    if (recording || !canRecord) return;
+    const [pxW, pxH] = REC_SIZES[$("rec-formato").value] || REC_SIZES.retrato;
+    const seconds = +$("rec-duracao").value || 15;
+    const withMusic = $("rec-musica").value === "sim" && tracks.length > 0;
+    const type = pickVideoType();
+
+    recording = { pxW, pxH, seconds, withMusic, type, chunks: [], cancelled: false,
+      music: { wasPlaying: !audio.paused, time: audio.currentTime } };
+    setPaused(false);
+    document.body.classList.add("recording");
+    $("screen").classList.add("recording-box");
+    $("rec-bar").hidden = false;
+    $("rec-total").textContent = fmtTime(seconds);
+    $("rec-tempo").textContent = "0:00";
+    $("rec-progresso").style.width = "0";
+    window.scrollTo(0, 0);
+    placeRecordingBox();
+    pos = 0; clock = 0; autoTimer = 0; // the sign starts from its beginning
+    relayout();
+    keepAwake();
+
+    const stream = cv.captureStream(30);
+    if (withMusic) {
+      const track = musicTrackForRecording();
+      if (track) stream.addTrack(track);
+      const t = trackById(currentId) || sortedTracks()[0];
+      if (t && t.id !== currentId) loadTrack(t);
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    } else if (!audio.paused) audio.pause();
+
+    let rec;
+    try {
+      // ~3.5 Mbit/s: sharp 720p text, and about 26 MB for a whole minute (light enough for WhatsApp).
+      rec = new MediaRecorder(stream, { mimeType: type || undefined, videoBitsPerSecond: 3_500_000, audioBitsPerSecond: 128_000 });
+    } catch (e) {
+      finishRecording(null);
+      toast("Este navegador não conseguiu começar a gravação.");
+      return;
+    }
+    recording.rec = rec;
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) recording.chunks.push(e.data); };
+    rec.onstop = () => {
+      const r = recording;
+      const blob = r && !r.cancelled && r.chunks.length ? new Blob(r.chunks, { type: (r.type || "video/webm").split(";")[0] }) : null;
+      finishRecording(blob);
+    };
+    rec.start(1000);
+    recording.startedAt = performance.now();
+    recording.timer = setInterval(() => {
+      const elapsed = (performance.now() - recording.startedAt) / 1000;
+      $("rec-tempo").textContent = fmtTime(Math.min(elapsed, seconds));
+      $("rec-progresso").style.width = Math.min(100, (elapsed / seconds) * 100) + "%";
+      if (elapsed >= seconds) stopRecording(false);
+    }, 200);
+  }
+
+  function stopRecording(cancel) {
+    if (!recording || recording.stopping) return;
+    recording.stopping = true;
+    recording.cancelled = cancel;
+    clearInterval(recording.timer);
+    if (recording.rec && recording.rec.state !== "inactive") recording.rec.stop();
+    else finishRecording(null);
+  }
+
+  function finishRecording(blob) {
+    const r = recording;
+    recording = null;
+    if (r) clearInterval(r.timer);
+    document.body.classList.remove("recording");
+    const scr = $("screen");
+    scr.classList.remove("recording-box");
+    for (const k of ["width", "height", "left", "top"]) scr.style[k] = "";
+    $("rec-bar").hidden = true;
+    // Put the music back the way it was.
+    if (r && r.withMusic) {
+      if (r.music.wasPlaying) audio.play().catch(() => {});
+      else { audio.pause(); audio.currentTime = r.music.time || 0; }
+    }
+    relayout();
+    if (!r || r.cancelled) { if (r) toast("Gravação cancelada."); return; }
+    if (!blob) { toast("Não foi possível gravar o vídeo neste aparelho."); return; }
+    const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+    const name = ($("texto").value.trim() || "Letreiro").replace(/[\\/:*?"<>|]+/g, "").slice(0, 50);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `Vídeo - ${name}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 20000);
+    const mb = (blob.size / 1024 / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+    toast(ext === "mp4"
+      ? `Vídeo salvo em Downloads (${mb} MB), pronto para o WhatsApp.`
+      : `Vídeo salvo em Downloads (${mb} MB) no formato WEBM. Se o WhatsApp não aceitar, grave pelo Chrome atualizado, que salva em MP4.`);
+  }
+
+  if (!canRecord) {
+    $("btn-video").hidden = true;
+    $("video-win").hidden = true;
+  } else if (!pickVideoType().includes("mp4")) {
+    $("rec-nota").textContent = "Este navegador grava em WEBM, que o WhatsApp pode não aceitar. No Chrome atualizado o vídeo sai em MP4.";
+  }
+  $("btn-video").addEventListener("click", () => $("video-win").scrollIntoView({ behavior: "smooth", block: "center" }));
+  $("rec-comecar").addEventListener("click", startRecording);
+  $("rec-parar").addEventListener("click", () => stopRecording(false));
+  $("rec-cancelar").addEventListener("click", () => stopRecording(true));
+  window.addEventListener("resize", placeRecordingBox);
+
   $("modelo").addEventListener("change", () => {
     const p = PRESETS[$("modelo").value];
     if (!p) return;
@@ -5081,6 +5301,12 @@
   document.addEventListener("visibilitychange", keepAwake);
   window.addEventListener("pointerdown", keepAwake);
   window.addEventListener("keydown", (e) => {
+    // While recording, only Esc (cancel) does anything, so nothing changes on camera.
+    if (recording) {
+      if (e.key === "Escape") stopRecording(true);
+      else if (!e.target.closest || !e.target.closest("button")) e.preventDefault();
+      return;
+    }
     // The player only answers to fullscreen and, when allowed, the way out.
     if (player) {
       if (e.key === "F11" && !fullscreenBlocked) { e.preventDefault(); toggleFullscreen(); }

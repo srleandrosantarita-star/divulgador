@@ -30,6 +30,11 @@ O arquivo baixado de um letreiro leva a música junto: ao abrir, toque na tela p
 Toque em **🖼 Meus fundos** e em **+ Adicionar imagem ou vídeo** para usar suas fotos ou vídeos como fundo do letreiro,
 com zoom lento, passeio pela imagem e opção de escurecer. Ficam guardados só no aparelho e vão junto no arquivo baixado.
 
+## Gravar vídeo
+
+Toque em **🎬 Gravar vídeo**, escolha o formato (em pé para status, deitado ou quadrado), a duração (até 1 minuto)
+e se leva a música. O letreiro é gravado sozinho, sem nenhum botão na imagem, e o vídeo MP4 vai para Downloads.
+
 ## O que tem
 
 - 162 fontes, 38 efeitos de letra, duas linhas de texto com cores próprias
