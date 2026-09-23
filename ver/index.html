@@ -2,16 +2,12 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Divulgador</title>
-<meta name="description" content="Letreiro animado para festas e eventos.">
 <meta name="theme-color" content="#0000a8">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
 <!-- Deferred: the page paints right away (so Android's opening screen goes away fast) and the fonts
      arrive a moment later, announced by the "divulgador-fontes" event. -->
-<script src="fonts/fonts.js" defer></script>
+<script src="../fonts/fonts.js" defer></script>
 <style>
   html, body { margin: 0; }
   :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -5156,12 +5152,6 @@
     loadStartupFonts();
   });
 })();
-</script>
-<script>
-  // Works offline once installed (only when served over http/https, not from disk).
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
 </script>
 </body>
 </html>

@@ -5,4 +5,5 @@ window.DIVULGADOR_FONT_CSS = "@font-face {\n  font-family: 'Anton';\n  font-styl
   s.id = "divulgador-fonts";
   s.textContent = window.DIVULGADOR_FONT_CSS;
   document.head.appendChild(s);
+  window.dispatchEvent(new Event("divulgador-fontes"));
 })();
