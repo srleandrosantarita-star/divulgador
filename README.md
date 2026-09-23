@@ -25,6 +25,11 @@ Toque em **♫ Música** e em **+ Adicionar música** para escolher uma música 
 toca em repetição enquanto o letreiro roda e começa sozinha ao exibir um letreiro salvo.
 O arquivo baixado de um letreiro leva a música junto: ao abrir, toque na tela para ela começar.
 
+## Meus fundos
+
+Toque em **🖼 Meus fundos** e em **+ Adicionar imagem ou vídeo** para usar suas fotos ou vídeos como fundo do letreiro,
+com zoom lento, passeio pela imagem e opção de escurecer. Ficam guardados só no aparelho e vão junto no arquivo baixado.
+
 ## O que tem
 
 - 162 fontes, 38 efeitos de letra, duas linhas de texto com cores próprias

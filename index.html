@@ -231,6 +231,28 @@
     .mus-row-actions { grid-column: 2 / -1; }
   }
   .status-music { color: var(--blue); }
+
+  /* My backgrounds */
+  .bg-fields { margin-top: 18px; }
+  .bg-grid {
+    list-style: none; margin: 18px 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); gap: 14px;
+  }
+  .bg-item { position: relative; border: 2px solid var(--grey); background: var(--black); min-width: 0; }
+  .bg-item.selected { border-color: var(--yellow); box-shadow: 0 0 0 2px var(--yellow); }
+  button.bg-pick { display: block; width: 100%; padding: 0; border: 0; box-shadow: none; background: var(--black); }
+  button.bg-pick:active { transform: none; }
+  .bg-pick img, .bg-pick video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+  .bg-name {
+    display: block; padding: 4px 8px; font-size: 18px; color: var(--white); text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bg-item.selected .bg-name { color: var(--yellow); }
+  .bg-kind { position: absolute; top: 6px; left: 6px; background: rgba(0, 0, 0, 0.72); color: var(--yellow); font-size: 16px; padding: 0 6px; pointer-events: none; }
+  button.bg-del { position: absolute; top: 6px; right: 6px; font-size: 16px; padding: 0 8px; box-shadow: 2px 2px 0 var(--black); }
+  button.bg-del.danger { background: var(--red); color: var(--white); }
+  .bg-grid .bg-empty { grid-column: 1 / -1; color: var(--grey); border: 0; }
+  #btn-fundos.on { background: var(--yellow); }
   #btn-musica.on { background: var(--yellow); }
 
   .actions { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
@@ -374,6 +396,7 @@
     <button id="btn-auto" type="button"><kbd>F6</kbd> Automático</button>
     <button id="btn-salvar" type="button">Salvar letreiro</button>
     <button id="btn-musica" type="button"><kbd>M</kbd> ♫ Música</button>
+    <button id="btn-fundos" type="button">🖼 Meus fundos</button>
   </div>
   <p class="toast" id="toast" role="status"></p>
 
@@ -439,6 +462,36 @@
     </div>
     <ol class="music-list" id="mus-lista"></ol>
     <p class="note">As músicas ficam guardadas <b>só neste aparelho</b>. Elas continuam tocando enquanto o letreiro é exibido.</p>
+  </section>
+
+  <section class="win" id="fundos-win">
+    <h2>[ 🖼 Meus fundos ]</h2>
+    <div class="music-add">
+      <label class="file-btn">+ Adicionar imagem ou vídeo
+        <input id="bg-arquivos" type="file" accept="image/*,video/*" multiple>
+      </label>
+      <span class="music-info" id="bg-info"></span>
+    </div>
+    <div class="fields bg-fields">
+      <label>Ajuste
+        <select id="meu-ajuste">
+          <option value="cobrir">Cobrir a tela toda</option>
+          <option value="inteira">Mostrar a imagem inteira</option>
+        </select>
+      </label>
+      <label>Movimento
+        <select id="meu-movimento">
+          <option value="zoom">Zoom lento</option>
+          <option value="passear">Passear pela imagem</option>
+          <option value="parado">Parado</option>
+        </select>
+      </label>
+      <label>Escurecer <output id="meu-escurecer-out"></output>
+        <input id="meu-escurecer" type="range" min="0" max="80" step="5" value="25">
+      </label>
+    </div>
+    <ul class="bg-grid" id="bg-lista"></ul>
+    <p class="note">Toque numa imagem para ela virar o fundo do letreiro. Ela fica guardada <b>só neste aparelho</b>. Escurecer ajuda as letras a aparecerem.</p>
   </section>
 
   <div class="cols">
@@ -1026,9 +1079,11 @@
 
   const REF = 100;
   const $ = (id) => document.getElementById(id);
-  const IDS = ["texto", "texto2", "tamanho2", "cores2", "cor-texto2", "cor-efeito2", "pintura2", "fonte", "estilo", "pintura", "mistura", "espaco", "cor-texto", "cor-efeito", "movimento", "letras", "fundo", "cor-fundo", "borda", "velocidade"];
+  const IDS = ["texto", "texto2", "tamanho2", "cores2", "cor-texto2", "cor-efeito2", "pintura2", "fonte", "estilo", "pintura", "mistura", "espaco", "cor-texto", "cor-efeito", "movimento", "letras", "fundo", "cor-fundo", "borda", "velocidade", "meu-ajuste", "meu-movimento", "meu-escurecer"];
   const AUTO_IDS = ["auto", "intervalo", "sortear", "transicao", "duracao", "embaralhar"];
   const STORE = "banner-exe-tela-v4"; // old internal name kept so saved settings survive the rename
+  // The user's own backgrounds: id -> { id, name, kind: "image"|"video", size, blob, el, url, ready, w, h }.
+  const userBgs = new Map();
   let mixSeed = 1 + Math.floor(Math.random() * 9999);
 
   // The second line's paint list mirrors the first one's.
@@ -1049,6 +1104,8 @@
     for (const id of IDS.concat(AUTO_IDS)) {
       if (obj[id] == null) continue;
       const el = $(id), v = String(obj[id]);
+      // The user's own backgrounds load a moment later, so their entry is reserved in the list first.
+      if (id === "fundo" && v.startsWith("meu:")) ensureUserBgOption(v);
       if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === v)) {
         const n = parseFloat(v);
         const nums = [...el.options].map((o) => o.value).filter((x) => !isNaN(parseFloat(x)));
@@ -1103,6 +1160,9 @@
       interval: +$("intervalo").value,
       scope: $("sortear").value,
       shuffle: $("embaralhar").value,
+      bgFit: $("meu-ajuste").value,
+      bgMove: $("meu-movimento").value,
+      bgDark: +$("meu-escurecer").value,
     };
   }
 
@@ -2005,6 +2065,7 @@
 
   function drawPartyScene(ctx, L, st, t, u) {
     const { W, H } = L;
+    if (st.scene.startsWith("meu:")) { drawUserBackground(ctx, W, H, st, t); return; }
     if (drawMoreScenes(ctx, W, H, st, t, u) || drawKidsScenes(ctx, W, H, st, t, u) || drawStageScenes(ctx, W, H, st, t, u)) return;
     switch (st.scene) {
       case "baloes":
@@ -3818,6 +3879,9 @@
     cv.setAttribute("aria-label", "Letreiro: " + ([st.text, st.text2].filter((s) => s.trim()).join(" / ") || "vazio"));
     $("espaco-out").textContent = st.spacing + "%";
     $("velocidade-out").textContent = st.speed;
+    $("meu-escurecer-out").textContent = st.bgDark + "%";
+    syncUserBgPlayback();
+    markSelectedBg();
     for (const id of ["cor-texto2", "cor-efeito2", "pintura2"]) $(id).disabled = !st.own2;
     $("intervalo-out").textContent = st.interval + " s";
     $("duracao-out").textContent = (+$("duracao").value).toLocaleString("pt-BR", { minimumFractionDigits: 1 }) + " s";
@@ -4253,9 +4317,10 @@
     toast("Preparando o arquivo…");
     const fonts = await fontCssFor(families);
     const music = await musicForFile().catch(() => null);
+    const bg = await bgForFile(v.fundo).catch(() => null);
     const safeTitle = entry.name.replace(/[<>&"]/g, "");
-    const baked = `<script>window.DIVULGADOR_PLAYER = ${JSON.stringify(v).replace(/</g, "\\u003c")};<\/script>` +
-      (music ? `\n<script>window.DIVULGADOR_MUSIC = ${JSON.stringify(music).replace(/</g, "\\u003c")};<\/script>` : "");
+    const script = (name, value) => `\n<script>window.${name} = ${JSON.stringify(value).replace(/</g, "\\u003c")};<\/script>`;
+    const baked = script("DIVULGADOR_PLAYER", v) + (music ? script("DIVULGADOR_MUSIC", music) : "") + (bg ? script("DIVULGADOR_BG", bg) : "");
     let html = SOURCE_HTML
       .replace(/<script src="fonts\/fonts\.js"><\/script>/, "")
       .replace(/<link[^>]+fonts\.googleapis\.com\/css2[^>]*>/g, "")
@@ -4709,6 +4774,282 @@
     }).catch(() => {
       $("mus-info").textContent = "Este navegador não deixa guardar músicas.";
     });
+  }
+
+  // ---------- my backgrounds ----------
+  // Photos and videos picked from the device become sign backgrounds. They are kept in IndexedDB
+  // (only on this device); the "Fundo" list gets them as "meu:<id>".
+  function idbStore(dbName, storeName) {
+    let opening = null;
+    const open = () => opening || (opening = new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error("IndexedDB indisponível")); return; }
+      const req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(storeName, { keyPath: "id" });
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }));
+    const run = (mode, action) => open().then((d) => new Promise((resolve, reject) => {
+      const t = d.transaction(storeName, mode);
+      const req = action(t.objectStore(storeName));
+      t.oncomplete = () => resolve(req && req.result);
+      t.onerror = t.onabort = () => reject(t.error || (req && req.error));
+    }));
+    return {
+      all: () => run("readonly", (s) => s.getAll()),
+      put: (rec) => run("readwrite", (s) => s.put(rec)),
+      del: (id) => run("readwrite", (s) => s.delete(id)),
+    };
+  }
+  const bgDb = idbStore("divulgador-fundos", "fundos");
+  // A downloaded sign file may carry its own background inside it (see bgForFile).
+  const bakedBg = window.DIVULGADOR_BG || null;
+  let thumbUrls = [];
+
+  const cleanFileName = (name, fallback) => name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim() || fallback;
+
+  // Reserves a "Fundo" list entry for one of the user's backgrounds, so the list can select it.
+  function ensureUserBgOption(value) {
+    const sel = $("fundo");
+    if ([...sel.options].some((o) => o.value === value)) return;
+    let grp = $("grupo-meus-fundos");
+    if (!grp) {
+      grp = document.createElement("optgroup");
+      grp.id = "grupo-meus-fundos";
+      grp.label = "Meus fundos";
+      sel.appendChild(grp);
+    }
+    const bg = userBgs.get(value.slice(4));
+    grp.appendChild(new Option(bg ? bg.name : "Meu fundo", value));
+  }
+
+  // Loads the image or video on first use; returns the entry when it can be drawn.
+  function userBgAsset(id) {
+    const a = userBgs.get(id);
+    if (!a) return null;
+    if (!a.el) {
+      a.url = URL.createObjectURL(a.blob);
+      if (a.kind === "video") {
+        const v = document.createElement("video");
+        v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto";
+        v.addEventListener("loadeddata", () => { a.ready = true; a.w = v.videoWidth; a.h = v.videoHeight; });
+        v.src = a.url;
+        v.play().catch(() => {});
+        a.el = v;
+      } else {
+        const img = new Image();
+        img.onload = () => { a.ready = true; a.w = img.naturalWidth; a.h = img.naturalHeight; };
+        img.src = a.url;
+        a.el = img;
+      }
+    }
+    return a;
+  }
+
+  // Only the video on screen keeps playing.
+  function syncUserBgPlayback() {
+    for (const a of userBgs.values()) {
+      if (a.kind !== "video" || !a.el) continue;
+      if (st.scene === "meu:" + a.id) { if (a.el.paused) a.el.play().catch(() => {}); }
+      else if (!a.el.paused) a.el.pause();
+    }
+  }
+
+  function drawUserBackground(ctx, W, H, st, t) {
+    const a = userBgAsset(st.scene.slice(4));
+    if (!a || !a.ready || !a.w || !a.h) return; // the plain background colour stays until it is ready
+    if (a.kind === "video" && a.el.paused && document.visibilityState === "visible") a.el.play().catch(() => {});
+    let s = st.bgFit === "inteira" ? Math.min(W / a.w, H / a.h) : Math.max(W / a.w, H / a.h);
+    let px = 0, py = 0;
+    if (st.bgMove === "zoom") s *= 1.07 + 0.07 * Math.sin(t * 0.12);
+    else if (st.bgMove === "passear") { s *= 1.2; px = Math.sin(t * 0.09); py = Math.cos(t * 0.07); }
+    const dw = a.w * s, dh = a.h * s;
+    const x = (W - dw) / 2 + px * Math.max(0, (dw - W) / 2);
+    const y = (H - dh) / 2 + py * Math.max(0, (dh - H) / 2);
+    ctx.drawImage(a.el, x, y, dw, dh);
+    if (st.bgDark > 0) {
+      ctx.fillStyle = `rgba(0, 0, 0, ${st.bgDark / 100})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // Checks the browser can show the file (some phone photo formats can't be opened by browsers).
+  function canShowMedia(file, kind) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const done = (ok) => { URL.revokeObjectURL(url); resolve(ok); };
+      const el = kind === "video" ? document.createElement("video") : new Image();
+      if (kind === "video") { el.preload = "metadata"; el.onloadedmetadata = () => done(true); }
+      else el.onload = () => done(true);
+      el.onerror = () => done(false);
+      el.src = url;
+    });
+  }
+
+  async function addBackgrounds(files) {
+    let added = 0, skipped = 0, full = false, last = null;
+    $("bg-info").textContent = "Guardando…";
+    for (const file of files) {
+      const kind = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : null;
+      if (!kind || !(await canShowMedia(file, kind))) { skipped++; continue; }
+      const rec = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        name: cleanFileName(file.name, kind === "video" ? "Meu vídeo" : "Minha imagem"),
+        kind, size: file.size, blob: file, added: Date.now(),
+      };
+      try { await bgDb.put(rec); } catch (e) { full = true; break; }
+      userBgs.set(rec.id, rec);
+      added++;
+      last = rec;
+    }
+    if (added && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    renderBackgrounds();
+    if (last) useBackground(last.id, true);
+    if (full) toast("Não há espaço para guardar mais fundos neste aparelho.");
+    else if (skipped) toast(skipped === 1
+      ? "Um arquivo não pôde ser aberto neste aparelho e ficou de fora (use JPG, PNG, WEBP ou MP4)."
+      : `${skipped} arquivos não puderam ser abertos neste aparelho e ficaram de fora (use JPG, PNG, WEBP ou MP4).`);
+  }
+
+  function useBackground(id, justAdded) {
+    const value = "meu:" + id;
+    ensureUserBgOption(value);
+    $("fundo").value = value;
+    $("modelo").value = "";
+    relayout();
+    toast(justAdded ? "Fundo adicionado e aplicado ao letreiro!" : "Fundo aplicado ao letreiro.");
+  }
+
+  async function removeBackground(id) {
+    try { await bgDb.del(id); } catch (e) {}
+    const a = userBgs.get(id);
+    if (a) {
+      if (a.el && a.kind === "video") a.el.pause();
+      if (a.url) URL.revokeObjectURL(a.url);
+    }
+    userBgs.delete(id);
+    if ($("fundo").value === "meu:" + id) { $("fundo").value = "liso"; relayout(); }
+    renderBackgrounds();
+    toast("Fundo apagado.");
+  }
+
+  function renderBackgrounds() {
+    // The "Fundo" list: one entry per background, keeping the current choice.
+    const sel = $("fundo"), current = sel.value;
+    const old = $("grupo-meus-fundos");
+    if (old) old.remove();
+    const list = [...userBgs.values()].sort((a, b) => (a.added || 0) - (b.added || 0));
+    if (list.length) {
+      const grp = document.createElement("optgroup");
+      grp.id = "grupo-meus-fundos";
+      grp.label = "Meus fundos";
+      for (const bg of list) grp.appendChild(new Option(bg.name + (bg.kind === "video" ? " (vídeo)" : ""), "meu:" + bg.id));
+      sel.appendChild(grp);
+    }
+    if (current.startsWith("meu:")) {
+      if (!userBgs.has(current.slice(4))) {
+        ensureUserBgOption(current);
+        const o = [...sel.options].find((x) => x.value === current);
+        if (o) o.text = "Meu fundo (não está neste aparelho)";
+      }
+      sel.value = current;
+    }
+    const mb = list.reduce((s, x) => s + (x.size || 0), 0) / 1024 / 1024;
+    $("bg-info").textContent = list.length
+      ? `${list.length === 1 ? "1 fundo" : list.length + " fundos"} · ${mb < 1 ? "menos de 1" : mb.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`
+      : "";
+
+    // The gallery.
+    thumbUrls.forEach((u) => URL.revokeObjectURL(u));
+    thumbUrls = [];
+    const ul = $("bg-lista");
+    ul.textContent = "";
+    if (!list.length) {
+      const li = document.createElement("li");
+      li.className = "bg-empty";
+      li.textContent = "Toque em “+ Adicionar imagem ou vídeo” e escolha uma foto ou um vídeo do aparelho.";
+      ul.appendChild(li);
+      return;
+    }
+    for (const bg of list) {
+      const li = document.createElement("li");
+      li.className = "bg-item";
+      li.dataset.id = bg.id;
+      const pickBtn = document.createElement("button");
+      pickBtn.type = "button";
+      pickBtn.className = "bg-pick";
+      pickBtn.setAttribute("aria-label", `Usar ${bg.name} como fundo`);
+      const url = URL.createObjectURL(bg.blob);
+      thumbUrls.push(url);
+      let thumb;
+      if (bg.kind === "video") {
+        thumb = document.createElement("video");
+        thumb.muted = true; thumb.preload = "metadata"; thumb.src = url + "#t=0.5";
+      } else {
+        thumb = document.createElement("img");
+        thumb.alt = "";
+        thumb.src = url;
+      }
+      const name = document.createElement("span");
+      name.className = "bg-name";
+      name.textContent = bg.name;
+      pickBtn.append(thumb, name);
+      pickBtn.addEventListener("click", () => useBackground(bg.id));
+      li.appendChild(pickBtn);
+      if (bg.kind === "video") {
+        const tag = document.createElement("span");
+        tag.className = "bg-kind";
+        tag.textContent = "vídeo";
+        li.appendChild(tag);
+      }
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "bg-del";
+      del.textContent = "✕";
+      del.setAttribute("aria-label", `Apagar ${bg.name}`);
+      del.addEventListener("click", () => {
+        if (del.dataset.armed) { removeBackground(bg.id); return; }
+        del.dataset.armed = "1"; del.textContent = "Apagar?"; del.classList.add("danger");
+        setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = "✕"; del.classList.remove("danger"); } }, 3000);
+      });
+      li.appendChild(del);
+      ul.appendChild(li);
+    }
+    markSelectedBg();
+  }
+
+  // Highlights the background in use (cheap: runs on every redraw of the settings).
+  function markSelectedBg() {
+    const current = $("fundo").value;
+    for (const li of $("bg-lista").children) li.classList.toggle("selected", current === "meu:" + li.dataset.id);
+    $("btn-fundos").classList.toggle("on", current.startsWith("meu:"));
+  }
+
+  // The background to put inside a sign file, when the sign uses one of the user's own.
+  async function bgForFile(fundo) {
+    if (!fundo || !fundo.startsWith("meu:")) return null;
+    const a = userBgs.get(fundo.slice(4));
+    if (!a || !a.blob) return null;
+    return { id: a.id, name: a.name, kind: a.kind, data: await blobToDataUrl(a.blob) };
+  }
+
+  $("bg-arquivos").addEventListener("change", (e) => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    if (files.length) addBackgrounds(files);
+  });
+  $("btn-fundos").addEventListener("click", () => $("fundos-win").scrollIntoView({ behavior: "smooth", block: "center" }));
+
+  if (bakedBg) {
+    userBgs.set(bakedBg.id, { id: bakedBg.id, name: bakedBg.name, kind: bakedBg.kind, blob: dataUrlToBlob(bakedBg.data) });
+    window.DIVULGADOR_BG = null; // now a Blob; drop the big text copy
+    renderBackgrounds();
+  } else {
+    renderBackgrounds();
+    bgDb.all().then((list) => {
+      for (const rec of list || []) userBgs.set(rec.id, rec);
+      renderBackgrounds();
+      relayout();
+    }).catch(() => { $("bg-info").textContent = "Este navegador não deixa guardar fundos."; });
   }
 
   $("modelo").addEventListener("change", () => {
