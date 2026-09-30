@@ -61,6 +61,8 @@
     padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
   }
   .statusbar kbd { font: inherit; color: var(--red); }
+  .statusbar .credito { margin-left: auto; }
+  .statusbar .credito a { color: var(--blue); }
 
   main {
     width: 100%;
@@ -888,16 +890,20 @@
   <span><kbd>M</kbd> Música</span>
   <span id="status-musica" class="status-music"></span>
   <span><kbd>Esc</kbd> Sair da tela cheia</span>
+  <span class="credito">Desenvolvido por <a href="https://solucoesdainternet.com.br/" target="_blank" rel="noopener">Soluções da Internet</a></span>
 </footer>
 
 <script>
 (() => {
   // The page as it was delivered, before this script changes anything: the base for saved-sign files.
   // The app's big block of embedded fonts is left out; each file gets only the fonts it uses.
+  // The developer credit is left out too: what guests receive carries only the user's sign.
   const SOURCE_HTML = (() => {
     const root = document.documentElement.cloneNode(true);
     const fonts = root.querySelector("#divulgador-fonts");
     if (fonts) fonts.remove();
+    const credito = root.querySelector(".statusbar .credito");
+    if (credito) credito.remove();
     return "<!doctype html>\n" + root.outerHTML;
   })();
 
